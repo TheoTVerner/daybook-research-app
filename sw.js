@@ -1,4 +1,4 @@
-const CACHE = 'daybook-v2';
+const CACHE = 'daybook-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -10,7 +10,13 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', function(e){
-  e.waitUntil(caches.open(CACHE).then(function(c){ return c.addAll(ASSETS); }));
+  e.waitUntil(
+    caches.open(CACHE).then(function(c){
+      return Promise.all(ASSETS.map(function(url){
+        return fetch(url, { cache: 'no-store' }).then(function(res){ return c.put(url, res); });
+      }));
+    })
+  );
   self.skipWaiting();
 });
 
@@ -28,7 +34,7 @@ self.addEventListener('activate', function(e){
 self.addEventListener('fetch', function(e){
   if(e.request.method !== 'GET') return;
   e.respondWith(
-    fetch(e.request).then(function(res){
+    fetch(e.request, { cache: 'no-store' }).then(function(res){
       if(res.ok && e.request.url.startsWith(self.location.origin)){
         var copy = res.clone();
         caches.open(CACHE).then(function(c){ c.put(e.request, copy); });
