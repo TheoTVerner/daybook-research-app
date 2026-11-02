@@ -1,12 +1,16 @@
-// Daybook news proxy — fetches public RSS feeds server-side (browsers can't due to CORS)
-// and returns clean JSON. Deploy as a Cloudflare Worker (paste into the dashboard's
-// online editor, no local tooling needed).
+// Daybook backend — one Cloudflare Worker, three routes:
+//   GET /            -> real news headlines (NYT, MarketWatch, CNBC RSS, server-side to dodge CORS)
+//   GET /quotes?symbols=AAPL,MSFT  -> real price + day change via Finnhub (free tier)
+//   GET /explain?symbol=NVDA&name=Nvidia  -> a grounded "why is it moving" summary via Workers AI
+//
+// Requires two things set in the Cloudflare dashboard (Worker > Settings):
+//   - Secret "FINNHUB_API_KEY": a free key from finnhub.io
+//   - Binding "AI": the built-in Workers AI binding (free tier, no extra signup)
 //
 // Reuters shut down its public RSS feeds a few years back and Yahoo Finance never
-// offered an official API, so neither is included here. Dow Jones' WSJ feeds
+// offered an official API, so neither is included. Dow Jones' WSJ feeds
 // (feeds.a.dj.com) are also dead in practice -- every endpoint tested returns content
-// frozen at January 2025, so WSJ is left out too until/unless they bring a feed back.
-// NYT, MarketWatch, and CNBC all still run active public RSS feeds.
+// frozen at January 2025. NYT, MarketWatch, and CNBC all still run active public feeds.
 
 const ALLOWED_ORIGIN = 'https://theotverner.github.io';
 
@@ -16,29 +20,20 @@ const FEEDS = [
   { source: 'CNBC', url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html' }
 ];
 
+const EXPLAIN_MODEL = '@cf/meta/llama-3.1-8b-instruct';
+
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders() });
     }
+    const url = new URL(request.url);
     try {
-      const results = await Promise.all(FEEDS.map(fetchFeed));
-      const items = results
-        .flat()
-        .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
-        .slice(0, 24);
-      return new Response(JSON.stringify({ items }), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'public, max-age=300',
-          ...corsHeaders()
-        }
-      });
+      if (url.pathname === '/quotes') return await handleQuotes(url, env);
+      if (url.pathname === '/explain') return await handleExplain(url, env);
+      return await handleNews();
     } catch (err) {
-      return new Response(JSON.stringify({ error: String(err) }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders() }
-      });
+      return json({ error: String(err) }, 500);
     }
   }
 };
@@ -51,11 +46,23 @@ function corsHeaders() {
   };
 }
 
+function json(body, status, cacheSeconds) {
+  const headers = { 'Content-Type': 'application/json', ...corsHeaders() };
+  if (cacheSeconds) headers['Cache-Control'] = 'public, max-age=' + cacheSeconds;
+  return new Response(JSON.stringify(body), { status: status || 200, headers });
+}
+
+// ---- /  (news) ----
+
+async function handleNews() {
+  const results = await Promise.all(FEEDS.map(fetchFeed));
+  const items = results.flat().sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)).slice(0, 24);
+  return json({ items }, 200, 300);
+}
+
 async function fetchFeed(feed) {
   try {
-    const res = await fetch(feed.url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DaybookNewsProxy/1.0)' }
-    });
+    const res = await fetch(feed.url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DaybookNewsProxy/1.0)' } });
     if (!res.ok) return [];
     const xml = await res.text();
     return parseItems(xml, feed.source);
@@ -106,4 +113,73 @@ function cleanText(str) {
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
     .trim();
+}
+
+// ---- /quotes (Finnhub) ----
+
+async function handleQuotes(url, env) {
+  const symbols = (url.searchParams.get('symbols') || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+  if (!symbols.length) return json({ error: 'no symbols given' }, 400);
+  if (!env.FINNHUB_API_KEY) return json({ error: 'FINNHUB_API_KEY not configured' }, 500);
+
+  const pairs = await Promise.all(symbols.map(async (sym) => {
+    try {
+      const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(sym)}&token=${env.FINNHUB_API_KEY}`);
+      if (!res.ok) return [sym, null];
+      const data = await res.json();
+      if (typeof data.c !== 'number' || data.c === 0) return [sym, null];
+      return [sym, { price: data.c, change: data.d, changePercent: data.dp }];
+    } catch (err) {
+      return [sym, null];
+    }
+  }));
+
+  const quotes = {};
+  for (const [sym, quote] of pairs) quotes[sym] = quote;
+  return json({ quotes }, 200, 60);
+}
+
+// ---- /explain (news match + Workers AI, grounded only) ----
+
+async function handleExplain(url, env) {
+  const symbol = (url.searchParams.get('symbol') || '').trim().toUpperCase();
+  const name = (url.searchParams.get('name') || '').trim();
+  if (!symbol || !name) return json({ error: 'symbol and name are required' }, 400);
+
+  const results = await Promise.all(FEEDS.map(fetchFeed));
+  const pool = results.flat();
+  const nameLower = name.toLowerCase();
+  const matches = pool.filter((item) => item.title.toLowerCase().includes(nameLower)).slice(0, 4);
+
+  if (matches.length === 0) {
+    return json({
+      summary: 'No recent headlines mention ' + name + ' in the general market feeds this app pulls from — no grounded explanation available.',
+      sources: []
+    }, 200, 300);
+  }
+
+  const headlineList = matches.map((m, i) => (i + 1) + '. ' + m.title + ' (' + m.source + ')').join('\n');
+  const prompt = 'Stock: ' + name + ' (' + symbol + ').\n' +
+    'Recent real headlines that mention this company:\n' + headlineList + '\n\n' +
+    'In one or two short sentences, explain the likely reason for the stock\'s recent move based ONLY on these headlines. ' +
+    'Do not invent any reason not supported by them. If the headlines don\'t clearly explain a price move, say so plainly.';
+
+  try {
+    const aiResponse = await env.AI.run(EXPLAIN_MODEL, {
+      messages: [
+        { role: 'system', content: 'You are a terse financial news summarizer. Be factual and concise. Never speculate beyond the given headlines.' },
+        { role: 'user', content: prompt }
+      ]
+    });
+    const summary = (aiResponse && aiResponse.response) ? aiResponse.response.trim() : 'Could not generate a summary right now.';
+    return json({
+      summary,
+      sources: matches.map((m) => ({ title: m.title, source: m.source, link: m.link }))
+    }, 200, 300);
+  } catch (err) {
+    return json({
+      summary: "Couldn't reach the summarizer right now. Recent related headlines are listed below.",
+      sources: matches.map((m) => ({ title: m.title, source: m.source, link: m.link }))
+    }, 200, 60);
+  }
 }

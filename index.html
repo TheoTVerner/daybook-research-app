@@ -151,10 +151,10 @@
 
       <p class="section-label">Watchlist</p>
       <ul class="watch-list" id="watchlistList">
-        <li><span class="sym">TSLA</span><span class="name">Tesla Inc.</span><span class="price">$248.12</span><span class="chg down">-1.4%</span><button class="remove-btn" onclick="this.closest('li').remove()">✕</button></li>
-        <li><span class="sym">PLTR</span><span class="name">Palantir Tech.</span><span class="price">$41.77</span><span class="chg up">+3.2%</span><button class="remove-btn" onclick="this.closest('li').remove()">✕</button></li>
-        <li><span class="sym">COIN</span><span class="name">Coinbase Global</span><span class="price">$198.45</span><span class="chg up">+4.6%</span><button class="remove-btn" onclick="this.closest('li').remove()">✕</button></li>
-        <li><span class="sym">SOFI</span><span class="name">SoFi Technologies</span><span class="price">$10.92</span><span class="chg up">+1.1%</span><button class="remove-btn" onclick="this.closest('li').remove()">✕</button></li>
+        <li data-sym="TSLA" data-name="Tesla"><span class="sym">TSLA</span><span class="name">Tesla Inc.</span><span class="price">$248.12</span><span class="chg down">-1.4%</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="View details">›</button><button class="remove-btn" onclick="this.closest('li').remove()">✕</button></li>
+        <li data-sym="PLTR" data-name="Palantir"><span class="sym">PLTR</span><span class="name">Palantir Tech.</span><span class="price">$41.77</span><span class="chg up">+3.2%</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="View details">›</button><button class="remove-btn" onclick="this.closest('li').remove()">✕</button></li>
+        <li data-sym="COIN" data-name="Coinbase"><span class="sym">COIN</span><span class="name">Coinbase Global</span><span class="price">$198.45</span><span class="chg up">+4.6%</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="View details">›</button><button class="remove-btn" onclick="this.closest('li').remove()">✕</button></li>
+        <li data-sym="SOFI" data-name="SoFi"><span class="sym">SOFI</span><span class="name">SoFi Technologies</span><span class="price">$10.92</span><span class="chg up">+1.1%</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="View details">›</button><button class="remove-btn" onclick="this.closest('li').remove()">✕</button></li>
       </ul>
 
       <p class="section-label">Add a Symbol</p>
@@ -227,8 +227,8 @@
     <div class="edit-overlay" id="editOverlay" hidden>
       <div class="edit-header">
         <button class="edit-cancel" onclick="closeEditOverlay()">Cancel</button>
-        <span class="edit-header-title">Edit Position</span>
-        <button class="edit-save" onclick="saveEditOverlay()">Save</button>
+        <span class="edit-header-title" id="editHeaderTitle">Edit Position</span>
+        <button class="edit-save" id="editSaveBtn" onclick="saveEditOverlay()">Save</button>
       </div>
       <div class="edit-ticker-row">
         <span class="edit-sym" id="editSym">AAPL</span>
@@ -238,7 +238,12 @@
         <span class="edit-price" id="editPrice">$227.41</span>
         <span class="edit-chg up" id="editChg">+0.8%</span>
       </div>
-      <div class="edit-fields">
+      <div class="edit-explain">
+        <p class="edit-explain-label">Today's Move</p>
+        <p class="edit-explain-text" id="editExplainText">Loading…</p>
+        <ul class="edit-explain-sources" id="editExplainSources"></ul>
+      </div>
+      <div class="edit-fields" id="editFieldsWrap">
         <label class="edit-field">
           <span>Shares</span>
           <input type="number" id="editSharesInput" min="0" step="any">
@@ -256,7 +261,7 @@
           </select>
         </label>
       </div>
-      <button class="edit-remove" onclick="removeEditPosition()">Remove from Portfolio</button>
+      <button class="edit-remove" id="editRemoveBtn" onclick="removeEditPosition()">Remove from Portfolio</button>
     </div>
   </div>
   <script src="app.js"></script>

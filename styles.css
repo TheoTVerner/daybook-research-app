@@ -161,7 +161,14 @@ body{
 .edit-price{ font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:22px; color:var(--terminal-amber); }
 .edit-chg{ font-weight:700; font-size:15px; }
 .edit-chg.up{ color:#3ad17a; } .edit-chg.down{ color:#ff5f5f; }
-.edit-fields{ flex:none; padding:18px 18px 8px; display:flex; flex-direction:column; gap:18px;
+.edit-explain{ flex:none; padding:4px 18px 18px; border-top:1px solid rgba(255,255,255,.1); }
+.edit-explain-label{ font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:rgba(231,233,238,.55);
+  font-weight:700; margin:14px 0 8px; }
+.edit-explain-text{ font-size:13.5px; line-height:1.5; color:var(--terminal-fg); margin:0 0 8px; }
+.edit-explain-sources{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; }
+.edit-explain-sources li a{ font-size:11.5px; color:var(--terminal-amber); text-decoration:none; }
+.edit-explain-sources li a:hover{ text-decoration:underline; }
+.edit-fields{ flex:none; padding:8px 18px 8px; display:flex; flex-direction:column; gap:18px;
   border-top:1px solid rgba(255,255,255,.1); }
 .edit-field{ display:flex; flex-direction:column; gap:6px; }
 .edit-field span{ font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:rgba(231,233,238,.55); font-weight:700; }
