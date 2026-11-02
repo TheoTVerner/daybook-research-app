@@ -163,6 +163,101 @@ addForm.addEventListener('submit', function(e){
   input.value = '';
 });
 
+// ---- Real news, fetched from the Cloudflare Worker RSS proxy ----
+var NEWS_API = 'https://daybook-research.ttverner.workers.dev/';
+var newsPool = [];
+
+var PORTFOLIO_MATCH = { AAPL:'Apple', MSFT:'Microsoft', NVDA:'Nvidia', AMZN:'Amazon', JPM:'JPMorgan', VOO:'Vanguard', FXAIX:'Fidelity' };
+var WATCHLIST_MATCH = { TSLA:'Tesla', PLTR:'Palantir', COIN:'Coinbase', SOFI:'SoFi' };
+
+function timeAgo(iso){
+  var diffMs = Date.now() - new Date(iso).getTime();
+  var mins = Math.round(diffMs / 60000);
+  if(mins < 1) return 'just now';
+  if(mins < 60) return mins + 'm ago';
+  var hrs = Math.round(mins / 60);
+  if(hrs < 24) return hrs + 'h ago';
+  return Math.round(hrs / 24) + 'd ago';
+}
+
+// Built via DOM APIs (not innerHTML) since this renders real, untrusted feed content.
+function createStoryElement(item, tickerPill){
+  var article = document.createElement('article');
+  article.className = 'story';
+
+  var meta = document.createElement('div');
+  meta.className = 'story-meta';
+  var source = document.createElement('span'); source.className = 'source'; source.textContent = item.source;
+  var dot = document.createElement('span'); dot.className = 'dot'; dot.textContent = '·';
+  var time = document.createElement('span'); time.className = 'time'; time.textContent = timeAgo(item.publishedAt);
+  meta.appendChild(source); meta.appendChild(dot); meta.appendChild(time);
+  if(tickerPill){
+    var pill = document.createElement('span'); pill.className = 'ticker-pill'; pill.textContent = tickerPill;
+    meta.appendChild(pill);
+  }
+
+  var head = document.createElement('h3'); head.className = 'story-head';
+  var a = document.createElement('a'); a.href = item.link; a.target = '_blank'; a.rel = 'noopener'; a.textContent = item.title;
+  head.appendChild(a);
+
+  var dek = document.createElement('p'); dek.className = 'story-dek'; dek.textContent = item.summary;
+
+  article.appendChild(meta); article.appendChild(head); article.appendChild(dek);
+  return article;
+}
+
+function emptyState(container, msg){
+  container.innerHTML = '';
+  var p = document.createElement('p');
+  p.className = 'story-empty';
+  p.textContent = msg;
+  container.appendChild(p);
+}
+
+function renderMarketsStories(){
+  var container = document.getElementById('marketsStories');
+  container.innerHTML = '';
+  var top = newsPool.slice(0, 6);
+  if(top.length === 0){ emptyState(container, 'No headlines available right now.'); return; }
+  top.forEach(function(item){ container.appendChild(createStoryElement(item, null)); });
+}
+
+function renderFilteredStories(containerId, matchMap, label){
+  var container = document.getElementById(containerId);
+  container.innerHTML = '';
+  var matched = [];
+  newsPool.forEach(function(item){
+    for(var sym in matchMap){
+      if(item.title.toLowerCase().indexOf(matchMap[sym].toLowerCase()) !== -1){
+        matched.push({ item: item, sym: sym });
+        break;
+      }
+    }
+  });
+  if(matched.length === 0){
+    emptyState(container, 'No real headlines currently mention your ' + label + ' — general market feeds mostly cover large caps and breaking news.');
+    return;
+  }
+  matched.slice(0, 6).forEach(function(m){ container.appendChild(createStoryElement(m.item, m.sym)); });
+}
+
+function loadNews(){
+  fetch(NEWS_API)
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      newsPool = data.items || [];
+      renderMarketsStories();
+      renderFilteredStories('portfolioStories', PORTFOLIO_MATCH, 'holdings');
+      renderFilteredStories('watchlistStories', WATCHLIST_MATCH, 'watchlist');
+    })
+    .catch(function(){
+      ['marketsStories', 'portfolioStories', 'watchlistStories'].forEach(function(id){
+        emptyState(document.getElementById(id), "Couldn't load live headlines right now. Check your connection and reopen the app.");
+      });
+    });
+}
+loadNews();
+
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
     navigator.serviceWorker.register('sw.js').catch(function(){});

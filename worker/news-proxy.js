@@ -3,13 +3,14 @@
 // online editor, no local tooling needed).
 //
 // Reuters shut down its public RSS feeds a few years back and Yahoo Finance never
-// offered an official API, so neither is included here. WSJ, NYT, MarketWatch, and
-// CNBC all still run active public RSS feeds.
+// offered an official API, so neither is included here. Dow Jones' WSJ feeds
+// (feeds.a.dj.com) are also dead in practice -- every endpoint tested returns content
+// frozen at January 2025, so WSJ is left out too until/unless they bring a feed back.
+// NYT, MarketWatch, and CNBC all still run active public RSS feeds.
 
 const ALLOWED_ORIGIN = 'https://theotverner.github.io';
 
 const FEEDS = [
-  { source: 'The Wall Street Journal', url: 'https://feeds.a.dj.com/rss/RSSMarketsMain.xml' },
   { source: 'The New York Times', url: 'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml' },
   { source: 'MarketWatch', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories' },
   { source: 'CNBC', url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html' }

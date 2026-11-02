@@ -59,6 +59,7 @@ body{
 .story-head a{ color:var(--app-ink); text-decoration:none; }
 .story-head a:hover{ text-decoration:underline; }
 .story-dek{ font-size:12.5px; line-height:1.5; color:var(--app-ink-soft); margin:0; }
+.story-loading, .story-empty{ padding:28px 18px; font-size:13px; color:var(--app-ink-soft); text-align:center; line-height:1.5; }
 
 .podcast-row{ display:flex; gap:14px; overflow-x:auto; padding:2px 18px 12px; }
 .podcast-card{ flex:none; width:76px; text-align:center; }
