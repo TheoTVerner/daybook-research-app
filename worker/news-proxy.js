@@ -96,10 +96,14 @@ function cleanText(str) {
     .replace('<![CDATA[', '')
     .replace(']]>', '')
     .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
+    .replace(/&#x([0-9a-fA-F]+);/g, function(_, hex){ return String.fromCodePoint(parseInt(hex, 16)); })
+    .replace(/&#(\d+);/g, function(_, dec){ return String.fromCodePoint(parseInt(dec, 10)); })
     .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
     .replace(/&#39;/g, "'")
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
     .trim();
 }
