@@ -20,7 +20,7 @@ const FEEDS = [
   { source: 'CNBC', url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html' }
 ];
 
-const EXPLAIN_MODEL = '@cf/meta/llama-3.1-8b-instruct';
+const EXPLAIN_MODEL = '@cf/meta/llama-3.2-3b-instruct';
 
 export default {
   async fetch(request, env) {
@@ -189,8 +189,7 @@ async function handleExplain(url, env) {
   } catch (err) {
     return json({
       summary: "Couldn't reach the summarizer right now. Recent related headlines are listed below.",
-      sources: matches.map((m) => ({ title: m.title, source: m.source, link: m.link })),
-      debugError: String(err && err.stack ? err.stack : err) // TEMPORARY -- remove once /explain works
+      sources: matches.map((m) => ({ title: m.title, source: m.source, link: m.link }))
     }, 200, 60);
   }
 }
