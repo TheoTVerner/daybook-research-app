@@ -1,4 +1,4 @@
-const CACHE = 'daybook-v1';
+const CACHE = 'daybook-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -23,18 +23,19 @@ self.addEventListener('activate', function(e){
   self.clients.claim();
 });
 
+// Network-first: always prefer the live file so updates show up immediately.
+// Only fall back to the cached copy when there's no connection at all.
 self.addEventListener('fetch', function(e){
   if(e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request).then(function(cached){
-      var fetchPromise = fetch(e.request).then(function(res){
-        if(res.ok && e.request.url.startsWith(self.location.origin)){
-          var copy = res.clone();
-          caches.open(CACHE).then(function(c){ c.put(e.request, copy); });
-        }
-        return res;
-      }).catch(function(){ return cached; });
-      return cached || fetchPromise;
+    fetch(e.request).then(function(res){
+      if(res.ok && e.request.url.startsWith(self.location.origin)){
+        var copy = res.clone();
+        caches.open(CACHE).then(function(c){ c.put(e.request, copy); });
+      }
+      return res;
+    }).catch(function(){
+      return caches.match(e.request);
     })
   );
 });
