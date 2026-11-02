@@ -189,7 +189,8 @@ async function handleExplain(url, env) {
   } catch (err) {
     return json({
       summary: "Couldn't reach the summarizer right now. Recent related headlines are listed below.",
-      sources: matches.map((m) => ({ title: m.title, source: m.source, link: m.link }))
+      sources: matches.map((m) => ({ title: m.title, source: m.source, link: m.link })),
+      debugError: String(err && err.stack ? err.stack : err) // TEMPORARY -- remove once /explain works
     }, 200, 60);
   }
 }
