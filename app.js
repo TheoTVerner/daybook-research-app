@@ -170,13 +170,16 @@ addForm.addEventListener('submit', function(e){
   var sym = input.value.trim().toUpperCase();
   if(!sym) return;
   input.value = '';
-  var displayName = NAME_HINTS[sym] || sym;
-
   fetchQuote(sym).then(function(quote){
     var priceStr = quote ? ('$' + quote.price.toFixed(2)) : '—';
     var chgVal = quote ? quote.changePercent : null;
     var chgStr = (chgVal === null) ? '—' : (chgVal >= 0 ? '+' : '') + chgVal.toFixed(1) + '%';
     var chgClass = (chgVal === null) ? '' : (chgVal >= 0 ? 'up' : 'down');
+
+    // Prefer Finnhub's real company name; fall back to the curated hints, then the bare symbol.
+    var displayName = (quote && quote.name) || NAME_HINTS[sym] || sym;
+    var matchKeyword = NAME_HINTS[sym] || deriveMatchKeyword(displayName) || sym;
+    NAME_HINTS[sym] = matchKeyword;
 
     if(target === 'portfolio'){
       var type = guessSecurityType(sym);
@@ -190,6 +193,8 @@ addForm.addEventListener('submit', function(e){
         '<span class="val-display">' + priceStr + '</span>' +
         '<button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button>';
       document.getElementById(GROUP_LIST_IDS[type]).appendChild(li1);
+      PORTFOLIO_MATCH[sym] = matchKeyword;
+      renderFilteredStories('portfolioStories', PORTFOLIO_MATCH, 'holdings');
     } else {
       var li2 = document.createElement('li');
       li2.dataset.sym = sym;
@@ -199,6 +204,8 @@ addForm.addEventListener('submit', function(e){
         '<button class="edit-btn" onclick="openEditOverlay(this)" aria-label="View details">›</button>' +
         '<button class="remove-btn" onclick="this.closest(\'li\').remove()">✕</button>';
       document.getElementById('watchlistList').appendChild(li2);
+      WATCHLIST_MATCH[sym] = matchKeyword;
+      renderFilteredStories('watchlistStories', WATCHLIST_MATCH, 'watchlist');
     }
   });
 });
@@ -219,16 +226,30 @@ function fetchQuote(sym){
     .catch(function(){ return null; });
 }
 
+// Strips common corporate suffixes to get a short keyword that's more likely to
+// actually appear in a headline ("Apple" matches "Apple reports..."; "Apple Inc"
+// usually doesn't). Used only as a fallback for tickers NAME_HINTS doesn't cover.
+function deriveMatchKeyword(fullName){
+  if(!fullName) return '';
+  var stripped = fullName.replace(/,?\s*(Incorporated|Inc|Corporation|Corp|Company|Co|Limited|Ltd|PLC|Holdings|Group|Technologies|Technology|Industries|Enterprises)\.?\s*$/i, '').trim();
+  return stripped.split(' ')[0];
+}
+
 function applyQuoteToLi(li, quote){
   if(!quote) return;
   var priceEl = li.querySelector('.price');
   var chgEl = li.querySelector('.chg');
+  var nameEl = li.querySelector('.name');
   if(priceEl) priceEl.textContent = '$' + quote.price.toFixed(2);
   if(chgEl && typeof quote.changePercent === 'number'){
     var pct = quote.changePercent;
     chgEl.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
     chgEl.classList.remove('up', 'down');
     chgEl.classList.add(pct >= 0 ? 'up' : 'down');
+  }
+  if(quote.name){
+    if(nameEl) nameEl.textContent = quote.name;
+    li.dataset.name = quote.name;
   }
 }
 

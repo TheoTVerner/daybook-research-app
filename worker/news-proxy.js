@@ -124,11 +124,21 @@ async function handleQuotes(url, env) {
 
   const pairs = await Promise.all(symbols.map(async (sym) => {
     try {
-      const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(sym)}&token=${env.FINNHUB_API_KEY}`);
-      if (!res.ok) return [sym, null];
-      const data = await res.json();
-      if (typeof data.c !== 'number' || data.c === 0) return [sym, null];
-      return [sym, { price: data.c, change: data.d, changePercent: data.dp }];
+      const [quoteRes, profileRes] = await Promise.all([
+        fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(sym)}&token=${env.FINNHUB_API_KEY}`),
+        fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(sym)}&token=${env.FINNHUB_API_KEY}`)
+      ]);
+      if (!quoteRes.ok) return [sym, null];
+      const quote = await quoteRes.json();
+      if (typeof quote.c !== 'number' || quote.c === 0) return [sym, null];
+
+      let name = null;
+      if (profileRes.ok) {
+        const profile = await profileRes.json();
+        if (profile && profile.name) name = profile.name;
+      }
+
+      return [sym, { price: quote.c, change: quote.d, changePercent: quote.dp, name }];
     } catch (err) {
       return [sym, null];
     }
