@@ -106,11 +106,15 @@
           <span class="tick"><b>NVDA</b> 138.56 <i class="up">▲2.3%</i></span>
           <span class="tick"><b>AMZN</b> 186.20 <i class="down">▼0.3%</i></span>
           <span class="tick"><b>JPM</b> 231.88 <i class="up">▲0.6%</i></span>
+          <span class="tick"><b>VOO</b> 512.30 <i class="up">▲0.5%</i></span>
+          <span class="tick"><b>FXAIX</b> 189.44 <i class="up">▲0.5%</i></span>
           <span class="tick"><b>AAPL</b> 227.41 <i class="up">▲0.8%</i></span>
           <span class="tick"><b>MSFT</b> 421.07 <i class="up">▲0.4%</i></span>
           <span class="tick"><b>NVDA</b> 138.56 <i class="up">▲2.3%</i></span>
           <span class="tick"><b>AMZN</b> 186.20 <i class="down">▼0.3%</i></span>
           <span class="tick"><b>JPM</b> 231.88 <i class="up">▲0.6%</i></span>
+          <span class="tick"><b>VOO</b> 512.30 <i class="up">▲0.5%</i></span>
+          <span class="tick"><b>FXAIX</b> 189.44 <i class="up">▲0.5%</i></span>
         </div>
       </div>
       <p class="section-label first">News on Your Holdings</p>
@@ -176,12 +180,24 @@
     <!-- MANAGE -->
     <section class="panel" id="panel-manage" hidden>
       <p class="section-label first">Portfolio</p>
-      <ul class="holdings-list" id="portfolioList">
-        <li><span class="sym">AAPL</span><span class="name">Apple Inc.</span><span class="qty-display">42 sh</span><input class="qty-input" type="number" min="0" step="1" value="42" hidden><span class="price">$227.41</span><span class="chg up">+0.8%</span><span class="val-display">$9,551</span><input class="val-input" type="number" min="0" step="1" value="9551" hidden><button class="edit-btn" onclick="toggleEdit(this)" aria-label="Edit position">✎</button></li>
-        <li><span class="sym">MSFT</span><span class="name">Microsoft Corp.</span><span class="qty-display">18 sh</span><input class="qty-input" type="number" min="0" step="1" value="18" hidden><span class="price">$421.07</span><span class="chg up">+0.4%</span><span class="val-display">$7,579</span><input class="val-input" type="number" min="0" step="1" value="7579" hidden><button class="edit-btn" onclick="toggleEdit(this)" aria-label="Edit position">✎</button></li>
-        <li><span class="sym">NVDA</span><span class="name">Nvidia Corp.</span><span class="qty-display">30 sh</span><input class="qty-input" type="number" min="0" step="1" value="30" hidden><span class="price">$138.56</span><span class="chg up">+2.3%</span><span class="val-display">$4,157</span><input class="val-input" type="number" min="0" step="1" value="4157" hidden><button class="edit-btn" onclick="toggleEdit(this)" aria-label="Edit position">✎</button></li>
-        <li><span class="sym">AMZN</span><span class="name">Amazon.com Inc.</span><span class="qty-display">22 sh</span><input class="qty-input" type="number" min="0" step="1" value="22" hidden><span class="price">$186.20</span><span class="chg down">-0.3%</span><span class="val-display">$4,096</span><input class="val-input" type="number" min="0" step="1" value="4096" hidden><button class="edit-btn" onclick="toggleEdit(this)" aria-label="Edit position">✎</button></li>
-        <li><span class="sym">JPM</span><span class="name">JPMorgan Chase</span><span class="qty-display">15 sh</span><input class="qty-input" type="number" min="0" step="1" value="15" hidden><span class="price">$231.88</span><span class="chg up">+0.6%</span><span class="val-display">$3,478</span><input class="val-input" type="number" min="0" step="1" value="3478" hidden><button class="edit-btn" onclick="toggleEdit(this)" aria-label="Edit position">✎</button></li>
+
+      <p class="group-label">Stocks</p>
+      <ul class="holdings-list" id="portfolioStocks">
+        <li data-sym="AAPL" data-name="Apple Inc." data-type="stock"><span class="sym">AAPL</span><span class="name">Apple Inc.</span><span class="qty-display">42 sh</span><span class="price">$227.41</span><span class="chg up">+0.8%</span><span class="val-display">$9,551</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button></li>
+        <li data-sym="MSFT" data-name="Microsoft Corp." data-type="stock"><span class="sym">MSFT</span><span class="name">Microsoft Corp.</span><span class="qty-display">18 sh</span><span class="price">$421.07</span><span class="chg up">+0.4%</span><span class="val-display">$7,579</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button></li>
+        <li data-sym="NVDA" data-name="Nvidia Corp." data-type="stock"><span class="sym">NVDA</span><span class="name">Nvidia Corp.</span><span class="qty-display">30 sh</span><span class="price">$138.56</span><span class="chg up">+2.3%</span><span class="val-display">$4,157</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button></li>
+        <li data-sym="AMZN" data-name="Amazon.com Inc." data-type="stock"><span class="sym">AMZN</span><span class="name">Amazon.com Inc.</span><span class="qty-display">22 sh</span><span class="price">$186.20</span><span class="chg down">-0.3%</span><span class="val-display">$4,096</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button></li>
+        <li data-sym="JPM" data-name="JPMorgan Chase" data-type="stock"><span class="sym">JPM</span><span class="name">JPMorgan Chase</span><span class="qty-display">15 sh</span><span class="price">$231.88</span><span class="chg up">+0.6%</span><span class="val-display">$3,478</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button></li>
+      </ul>
+
+      <p class="group-label">ETFs</p>
+      <ul class="holdings-list" id="portfolioETFs">
+        <li data-sym="VOO" data-name="Vanguard S&amp;P 500 ETF" data-type="etf"><span class="sym">VOO</span><span class="name">Vanguard S&amp;P 500 ETF</span><span class="qty-display">10 sh</span><span class="price">$512.30</span><span class="chg up">+0.5%</span><span class="val-display">$5,123</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button></li>
+      </ul>
+
+      <p class="group-label">Mutual Funds</p>
+      <ul class="holdings-list" id="portfolioFunds">
+        <li data-sym="FXAIX" data-name="Fidelity 500 Index Fund" data-type="fund"><span class="sym">FXAIX</span><span class="name">Fidelity 500 Index Fund</span><span class="qty-display">50.2 sh</span><span class="price">$189.44</span><span class="chg up">+0.5%</span><span class="val-display">$9,510</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button></li>
       </ul>
 
       <p class="section-label">Watchlist</p>
@@ -257,6 +273,42 @@
         <span class="tab-icon-wrap"><svg viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><circle cx="9" cy="6" r="2"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="7" cy="18" r="2"/></svg></span>
       </button>
     </nav>
+
+    <!-- EDIT POSITION (full-page, trading-terminal styled) -->
+    <div class="edit-overlay" id="editOverlay" hidden>
+      <div class="edit-header">
+        <button class="edit-cancel" onclick="closeEditOverlay()">Cancel</button>
+        <span class="edit-header-title">Edit Position</span>
+        <button class="edit-save" onclick="saveEditOverlay()">Save</button>
+      </div>
+      <div class="edit-ticker-row">
+        <span class="edit-sym" id="editSym">AAPL</span>
+        <span class="edit-name" id="editName">Apple Inc.</span>
+      </div>
+      <div class="edit-price-row">
+        <span class="edit-price" id="editPrice">$227.41</span>
+        <span class="edit-chg up" id="editChg">+0.8%</span>
+      </div>
+      <div class="edit-fields">
+        <label class="edit-field">
+          <span>Shares</span>
+          <input type="number" id="editSharesInput" min="0" step="any">
+        </label>
+        <label class="edit-field">
+          <span>Amount Invested</span>
+          <input type="number" id="editInvestedInput" min="0" step="any">
+        </label>
+        <label class="edit-field">
+          <span>Type</span>
+          <select id="editTypeInput">
+            <option value="stock">Stock</option>
+            <option value="etf">ETF</option>
+            <option value="fund">Mutual Fund</option>
+          </select>
+        </label>
+      </div>
+      <button class="edit-remove" onclick="removeEditPosition()">Remove from Portfolio</button>
+    </div>
   </div>
   <script src="app.js"></script>
 </body>

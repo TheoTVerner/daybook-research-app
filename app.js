@@ -62,24 +62,63 @@ function buildCalendar(){
 }
 buildCalendar();
 
-function toggleEdit(btn){
+// Heuristic only (no real security-type data source wired up yet): mutual funds are
+// conventionally a 5-letter ticker ending in X; everything else known here is a short
+// list of common ETFs, otherwise default to a plain stock.
+var KNOWN_ETFS = ['SPY','VOO','QQQ','VTI','IVV','IWM','DIA','ARKK','VXUS','SCHD','VYM','XLK','XLF','GLD','BND','AGG'];
+function guessSecurityType(sym){
+  if(/^[A-Z]{4}X$/.test(sym)) return 'fund';
+  if(KNOWN_ETFS.indexOf(sym) !== -1) return 'etf';
+  return 'stock';
+}
+var GROUP_LIST_IDS = { stock:'portfolioStocks', etf:'portfolioETFs', fund:'portfolioFunds' };
+
+var currentEditLi = null;
+
+function openEditOverlay(btn){
   var li = btn.closest('li');
-  var editing = li.classList.toggle('editing');
-  var qtyDisplay = li.querySelector('.qty-display'), qtyInput = li.querySelector('.qty-input');
-  var valDisplay = li.querySelector('.val-display'), valInput = li.querySelector('.val-input');
-  if(editing){
-    qtyDisplay.hidden = true; qtyInput.hidden = false; qtyInput.focus();
-    valDisplay.hidden = true; valInput.hidden = false;
-    btn.textContent = '✓';
-  } else {
-    var shares = parseFloat(qtyInput.value) || 0;
-    var invested = parseFloat(valInput.value) || 0;
-    qtyDisplay.textContent = shares + ' sh';
-    valDisplay.textContent = '$' + invested.toLocaleString();
-    qtyDisplay.hidden = false; qtyInput.hidden = true;
-    valDisplay.hidden = false; valInput.hidden = true;
-    btn.textContent = '✎';
+  currentEditLi = li;
+  document.getElementById('editSym').textContent = li.dataset.sym;
+  document.getElementById('editName').textContent = li.dataset.name;
+  document.getElementById('editPrice').textContent = li.querySelector('.price').textContent;
+
+  var chgEl = li.querySelector('.chg');
+  var editChg = document.getElementById('editChg');
+  editChg.textContent = chgEl.textContent;
+  editChg.className = 'edit-chg ' + (chgEl.classList.contains('up') ? 'up' : 'down');
+
+  document.getElementById('editSharesInput').value = parseFloat(li.querySelector('.qty-display').textContent) || 0;
+  document.getElementById('editInvestedInput').value = parseFloat(li.querySelector('.val-display').textContent.replace(/[^0-9.]/g, '')) || 0;
+  document.getElementById('editTypeInput').value = li.dataset.type || 'stock';
+
+  document.getElementById('editOverlay').hidden = false;
+}
+
+function closeEditOverlay(){
+  document.getElementById('editOverlay').hidden = true;
+  currentEditLi = null;
+}
+
+function saveEditOverlay(){
+  if(!currentEditLi) return;
+  var shares = parseFloat(document.getElementById('editSharesInput').value) || 0;
+  var invested = parseFloat(document.getElementById('editInvestedInput').value) || 0;
+  var newType = document.getElementById('editTypeInput').value;
+
+  currentEditLi.querySelector('.qty-display').textContent = shares + ' sh';
+  currentEditLi.querySelector('.val-display').textContent = '$' + invested.toLocaleString();
+
+  if(newType !== currentEditLi.dataset.type){
+    currentEditLi.dataset.type = newType;
+    var target = document.getElementById(GROUP_LIST_IDS[newType]);
+    if(target) target.appendChild(currentEditLi);
   }
+  closeEditOverlay();
+}
+
+function removeEditPosition(){
+  if(currentEditLi) currentEditLi.remove();
+  closeEditOverlay();
 }
 
 function toggleConnector(btn){
@@ -103,13 +142,17 @@ addForm.addEventListener('submit', function(e){
   var chgClass = chgVal >= 0 ? 'up' : 'down';
 
   if(target === 'portfolio'){
+    var type = guessSecurityType(sym);
     var li1 = document.createElement('li');
+    li1.dataset.sym = sym;
+    li1.dataset.name = 'New Holding';
+    li1.dataset.type = type;
     li1.innerHTML = '<span class="sym">' + sym + '</span><span class="name">New Holding</span>' +
-      '<span class="qty-display">1 sh</span><input class="qty-input" type="number" min="0" step="1" value="1" hidden>' +
-      '<span class="price">$' + price + '</span><span class="chg ' + chgClass + '">' + chgStr + '</span>' +
-      '<span class="val-display">$' + price + '</span><input class="val-input" type="number" min="0" step="1" value="' + price + '" hidden>' +
-      '<button class="edit-btn" onclick="toggleEdit(this)" aria-label="Edit position">✎</button>';
-    document.getElementById('portfolioList').appendChild(li1);
+      '<span class="qty-display">1 sh</span><span class="price">$' + price + '</span>' +
+      '<span class="chg ' + chgClass + '">' + chgStr + '</span>' +
+      '<span class="val-display">$' + price + '</span>' +
+      '<button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button>';
+    document.getElementById(GROUP_LIST_IDS[type]).appendChild(li1);
   } else {
     var li2 = document.createElement('li');
     li2.innerHTML = '<span class="sym">' + sym + '</span><span class="name">Watching</span>' +

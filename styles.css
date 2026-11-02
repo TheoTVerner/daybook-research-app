@@ -45,6 +45,8 @@ body{
 .section-label{ font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--app-ink-soft); font-weight:700;
   padding:14px 18px 7px; }
 .section-label.first{ padding-top:16px; }
+.group-label{ font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--app-crimson); font-weight:700;
+  padding:10px 18px 4px; }
 
 .story{ padding:11px 18px; border-bottom:1px solid var(--app-rule); }
 .story-meta{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:10.5px; letter-spacing:.03em; text-transform:uppercase;
@@ -128,7 +130,8 @@ body{
 .cal-title{ flex:1; min-width:0; }
 .cal-time{ flex:none; color:var(--app-ink-soft); font-size:11px; }
 
-.tabbar{ flex:none; height:62px; padding-bottom:env(safe-area-inset-bottom,0px); display:flex; background:var(--app-navy);
+.tabbar{ flex:none; display:flex; align-items:center;
+  padding:10px 0 calc(10px + env(safe-area-inset-bottom,0px)); background:var(--app-navy);
   border-top:1px solid rgba(255,255,255,.08); }
 .tab{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none;
   color:var(--app-silver); position:relative; }
@@ -136,3 +139,32 @@ body{
 .tab svg{ width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:1.8; }
 .tab.active{ color:#fff; }
 .tab.active .tab-icon-wrap{ background:rgba(156,43,43,.3); }
+
+/* ---- full-page position editor, styled like a trading terminal ---- */
+.edit-overlay[hidden]{ display:none; }
+.edit-overlay{ position:fixed; inset:0; z-index:50; background:var(--terminal-bg); color:var(--terminal-fg);
+  display:flex; flex-direction:column;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  padding-left:env(safe-area-inset-left,0px); padding-right:env(safe-area-inset-right,0px); }
+.edit-header{ flex:none; display:flex; align-items:center; justify-content:space-between; padding:14px 18px;
+  border-bottom:1px solid rgba(255,255,255,.12); }
+.edit-header-title{ font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+  font-size:13px; color:var(--terminal-fg); }
+.edit-cancel, .edit-save{ background:none; border:none; font-size:14px; font-weight:700; padding:4px; font-family:'Inter',sans-serif; }
+.edit-cancel{ color:var(--terminal-fg); opacity:.65; }
+.edit-save{ color:var(--terminal-amber); }
+.edit-ticker-row{ flex:none; display:flex; align-items:baseline; gap:10px; padding:22px 18px 4px; }
+.edit-sym{ font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:36px; color:#fff; letter-spacing:.02em; }
+.edit-name{ font-size:13px; color:rgba(231,233,238,.6); }
+.edit-price-row{ flex:none; display:flex; align-items:baseline; gap:10px; padding:0 18px 22px; font-variant-numeric:tabular-nums; }
+.edit-price{ font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:22px; color:var(--terminal-amber); }
+.edit-chg{ font-weight:700; font-size:15px; }
+.edit-chg.up{ color:#3ad17a; } .edit-chg.down{ color:#ff5f5f; }
+.edit-fields{ flex:none; padding:18px 18px 8px; display:flex; flex-direction:column; gap:18px;
+  border-top:1px solid rgba(255,255,255,.1); }
+.edit-field{ display:flex; flex-direction:column; gap:6px; }
+.edit-field span{ font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:rgba(231,233,238,.55); font-weight:700; }
+.edit-field input, .edit-field select{ background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.22); border-radius:8px;
+  color:#fff; font-size:16px; padding:11px 12px; font-variant-numeric:tabular-nums; font-family:'Inter',sans-serif; }
+.edit-remove{ margin:auto 18px 24px; padding:13px 0; border-radius:8px; border:1px solid var(--app-down);
+  background:none; color:#ff6f6f; font-weight:700; font-size:13px; }
