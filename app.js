@@ -139,7 +139,18 @@ var GROUP_LIST_IDS = { stock:'portfolioStocks', etf:'portfolioETFs', fund:'portf
 var currentEditLi = null;
 
 function openEditOverlay(btn){
-  var li = btn.closest('li');
+  openEditOverlayForLi(btn.closest('li'));
+}
+
+function openStockDetailBySymbol(sym){
+  var li = document.querySelector(
+    '#portfolioStocks [data-sym="' + sym + '"], #portfolioETFs [data-sym="' + sym + '"], ' +
+    '#portfolioFunds [data-sym="' + sym + '"], #watchlistList [data-sym="' + sym + '"]'
+  );
+  if(li) openEditOverlayForLi(li);
+}
+
+function openEditOverlayForLi(li){
   currentEditLi = li;
   var isWatchlist = !!li.closest('#watchlistList');
 
@@ -165,6 +176,11 @@ function openEditOverlay(btn){
 
   document.getElementById('editOverlay').hidden = false;
   loadExplain(li.dataset.sym, NAME_HINTS[li.dataset.sym] || li.dataset.name);
+  loadResearchNotes(li.dataset.sym);
+
+  currentChartRange = '1D';
+  document.querySelectorAll('.chart-tab').forEach(function(b){ b.classList.toggle('active', b.dataset.range === '1D'); });
+  loadChart(li.dataset.sym, '1D');
 }
 
 function loadExplain(sym, name){
@@ -195,6 +211,101 @@ function closeEditOverlay(){
   currentEditLi = null;
 }
 
+// ---- Historical chart (via the Worker's /candles route, Twelve Data under the hood --
+// Finnhub's free tier doesn't include historical candles at all) ----
+var currentChartRange = '1D';
+
+function loadChart(sym, range){
+  var svg = document.getElementById('chartSvg');
+  var loading = document.getElementById('chartLoading');
+  svg.innerHTML = '';
+  loading.hidden = false;
+  loading.textContent = 'Loading chart…';
+  fetch(NEWS_API + 'candles?symbol=' + encodeURIComponent(sym) + '&range=' + encodeURIComponent(range))
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      var points = data.points || [];
+      if(points.length < 2){ loading.textContent = 'No chart data available for this range.'; return; }
+      drawChart(points);
+      loading.hidden = true;
+    })
+    .catch(function(){ loading.textContent = "Couldn't load chart data right now."; });
+}
+
+function drawChart(points){
+  var svg = document.getElementById('chartSvg');
+  var w = 320, h = 120, pad = 4;
+  var closes = points.map(function(p){ return p.c; });
+  var min = Math.min.apply(null, closes);
+  var max = Math.max.apply(null, closes);
+  var span = (max - min) || 1;
+  var stepX = (w - pad * 2) / (points.length - 1);
+
+  var coords = points.map(function(p, i){
+    var x = pad + i * stepX;
+    var y = pad + (h - pad * 2) * (1 - (p.c - min) / span);
+    return x.toFixed(2) + ',' + y.toFixed(2);
+  });
+
+  var up = closes[closes.length - 1] >= closes[0];
+  var color = up ? '#3ad17a' : '#ff5f5f';
+
+  svg.innerHTML = '';
+  svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+
+  var fillPts = coords.concat([(w - pad) + ',' + (h - pad), pad + ',' + (h - pad)]);
+  var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+  poly.setAttribute('points', fillPts.join(' '));
+  poly.setAttribute('fill', color);
+  poly.setAttribute('opacity', '0.12');
+  svg.appendChild(poly);
+
+  var line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  line.setAttribute('points', coords.join(' '));
+  line.setAttribute('fill', 'none');
+  line.setAttribute('stroke', color);
+  line.setAttribute('stroke-width', '2');
+  line.setAttribute('vector-effect', 'non-scaling-stroke');
+  svg.appendChild(line);
+}
+
+var chartTabsEl = document.getElementById('chartTabs');
+if(chartTabsEl){
+  chartTabsEl.addEventListener('click', function(e){
+    var btn = e.target.closest('.chart-tab');
+    if(!btn || !currentEditLi) return;
+    currentChartRange = btn.dataset.range;
+    document.querySelectorAll('.chart-tab').forEach(function(b){ b.classList.toggle('active', b === btn); });
+    loadChart(currentEditLi.dataset.sym, currentChartRange);
+  });
+}
+
+// ---- My Research: the user's own notes on a company, persisted locally per symbol ----
+var RESEARCH_NOTES_KEY = 'daybook_research_notes';
+
+function getResearchNotes(){
+  try{ return JSON.parse(localStorage.getItem(RESEARCH_NOTES_KEY) || '{}'); }catch(e){ return {}; }
+}
+
+function loadResearchNotes(sym){
+  var notes = getResearchNotes();
+  document.getElementById('researchNotesInput').value = notes[sym] || '';
+  document.getElementById('researchSavedHint').hidden = true;
+}
+
+function saveResearchNotes(){
+  if(!currentEditLi) return;
+  var sym = currentEditLi.dataset.sym;
+  var notes = getResearchNotes();
+  var text = document.getElementById('researchNotesInput').value;
+  if(text.trim()) notes[sym] = text; else delete notes[sym];
+  try{ localStorage.setItem(RESEARCH_NOTES_KEY, JSON.stringify(notes)); }catch(e){}
+  var hint = document.getElementById('researchSavedHint');
+  hint.hidden = false;
+  clearTimeout(saveResearchNotes._t);
+  saveResearchNotes._t = setTimeout(function(){ hint.hidden = true; }, 1800);
+}
+
 function saveEditOverlay(){
   if(!currentEditLi) return;
   var shares = parseFloat(document.getElementById('editSharesInput').value) || 0;
@@ -209,6 +320,8 @@ function saveEditOverlay(){
     var target = document.getElementById(GROUP_LIST_IDS[newType]);
     if(target) target.appendChild(currentEditLi);
   }
+  persistPortfolio();
+  syncAllTickerTapes();
   closeEditOverlay();
 }
 
@@ -218,8 +331,14 @@ function removeEditPosition(){
   closeEditOverlay();
   buildCalendar();
   syncPushSymbols();
-  if(wasWatchlist) loadCompanyNews('watchlistStories', collectWatchlistSymbols(), WATCHLIST_MATCH, 'watchlist');
-  else loadCompanyNews('portfolioStories', collectPortfolioSymbols(), PORTFOLIO_MATCH, 'holdings');
+  syncAllTickerTapes();
+  if(wasWatchlist){
+    persistWatchlist();
+    loadCompanyNews('watchlistStories', collectWatchlistSymbols(), WATCHLIST_MATCH, 'watchlist');
+  } else {
+    persistPortfolio();
+    loadCompanyNews('portfolioStories', collectPortfolioSymbols(), PORTFOLIO_MATCH, 'holdings');
+  }
 }
 
 function toggleConnector(btn){
@@ -251,32 +370,21 @@ addForm.addEventListener('submit', function(e){
 
     if(target === 'portfolio'){
       var type = guessSecurityType(sym);
-      var li1 = document.createElement('li');
-      li1.dataset.sym = sym;
-      li1.dataset.name = displayName;
-      li1.dataset.type = type;
-      li1.innerHTML = '<span class="sym">' + sym + '</span><span class="name">' + displayName + '</span>' +
-        '<span class="qty-display">1 sh</span><span class="price">' + priceStr + '</span>' +
-        '<span class="chg ' + chgClass + '">' + chgStr + '</span>' +
-        '<span class="val-display">' + priceStr + '</span>' +
-        '<button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button>';
+      var li1 = buildPortfolioLi(sym, displayName, type, priceStr, chgStr, chgClass);
       document.getElementById(GROUP_LIST_IDS[type]).appendChild(li1);
       PORTFOLIO_MATCH[sym] = matchKeyword;
       loadCompanyNews('portfolioStories', collectPortfolioSymbols(), PORTFOLIO_MATCH, 'holdings');
+      persistPortfolio();
     } else {
-      var li2 = document.createElement('li');
-      li2.dataset.sym = sym;
-      li2.dataset.name = displayName;
-      li2.innerHTML = '<span class="sym">' + sym + '</span><span class="name">' + displayName + '</span>' +
-        '<span class="price">' + priceStr + '</span><span class="chg ' + chgClass + '">' + chgStr + '</span>' +
-        '<button class="edit-btn" onclick="openEditOverlay(this)" aria-label="View details">›</button>' +
-        '<button class="remove-btn" onclick="removeWatchlistRow(this)">✕</button>';
+      var li2 = buildWatchlistLi(sym, displayName, priceStr, chgStr, chgClass);
       document.getElementById('watchlistList').appendChild(li2);
       WATCHLIST_MATCH[sym] = matchKeyword;
       loadCompanyNews('watchlistStories', collectWatchlistSymbols(), WATCHLIST_MATCH, 'watchlist');
+      persistWatchlist();
     }
     buildCalendar();
     syncPushSymbols();
+    syncAllTickerTapes();
   });
 });
 
@@ -284,6 +392,8 @@ function removeWatchlistRow(btn){
   btn.closest('li').remove();
   buildCalendar();
   syncPushSymbols();
+  syncAllTickerTapes();
+  persistWatchlist();
   loadCompanyNews('watchlistStories', collectWatchlistSymbols(), WATCHLIST_MATCH, 'watchlist');
 }
 
@@ -293,6 +403,147 @@ var newsPool = [];
 var PORTFOLIO_MATCH = { AAPL:'Apple', MSFT:'Microsoft', NVDA:'Nvidia', AMZN:'Amazon', JPM:'JPMorgan', VOO:'Vanguard', FXAIX:'Fidelity' };
 var WATCHLIST_MATCH = { TSLA:'Tesla', PLTR:'Palantir', COIN:'Coinbase', SOFI:'SoFi' };
 var NAME_HINTS = Object.assign({}, PORTFOLIO_MATCH, WATCHLIST_MATCH);
+
+// ---- Portfolio/watchlist persistence: previously the DOM was the only copy of this data,
+// so edits/adds/removes were silently lost on every reload. Saved to localStorage, keyed
+// per browser/device (there's no account system, so nothing syncs across devices). ----
+var PORTFOLIO_STORE_KEY = 'daybook_portfolio_state_v1';
+var WATCHLIST_STORE_KEY = 'daybook_watchlist_state_v1';
+
+function buildPortfolioLi(sym, name, type, priceStr, chgStr, chgClass){
+  var li = document.createElement('li');
+  li.dataset.sym = sym;
+  li.dataset.name = name;
+  li.dataset.type = type;
+  li.innerHTML = '<span class="sym">' + sym + '</span><span class="name">' + name + '</span>' +
+    '<span class="qty-display">1 sh</span><span class="price">' + priceStr + '</span>' +
+    '<span class="chg ' + chgClass + '">' + chgStr + '</span>' +
+    '<span class="val-display">' + priceStr + '</span>' +
+    '<button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button>';
+  return li;
+}
+
+function buildWatchlistLi(sym, name, priceStr, chgStr, chgClass){
+  var li = document.createElement('li');
+  li.dataset.sym = sym;
+  li.dataset.name = name;
+  li.innerHTML = '<span class="sym">' + sym + '</span><span class="name">' + name + '</span>' +
+    '<span class="price">' + priceStr + '</span><span class="chg ' + chgClass + '">' + chgStr + '</span>' +
+    '<button class="edit-btn" onclick="openEditOverlay(this)" aria-label="View details">›</button>' +
+    '<button class="remove-btn" onclick="removeWatchlistRow(this)">✕</button>';
+  return li;
+}
+
+function serializePortfolio(){
+  var items = [];
+  document.querySelectorAll('#portfolioStocks li, #portfolioETFs li, #portfolioFunds li').forEach(function(li){
+    var chgEl = li.querySelector('.chg');
+    items.push({
+      sym: li.dataset.sym,
+      name: li.dataset.name,
+      type: li.dataset.type,
+      matchKeyword: NAME_HINTS[li.dataset.sym] || '',
+      shares: parseFloat(li.querySelector('.qty-display').textContent) || 0,
+      invested: parseFloat(li.querySelector('.val-display').textContent.replace(/[^0-9.]/g, '')) || 0,
+      price: li.querySelector('.price').textContent,
+      chg: chgEl.textContent,
+      chgClass: chgEl.classList.contains('up') ? 'up' : 'down'
+    });
+  });
+  return items;
+}
+
+function persistPortfolio(){
+  try{ localStorage.setItem(PORTFOLIO_STORE_KEY, JSON.stringify(serializePortfolio())); }catch(e){}
+}
+
+function serializeWatchlist(){
+  var items = [];
+  document.querySelectorAll('#watchlistList li').forEach(function(li){
+    var chgEl = li.querySelector('.chg');
+    items.push({
+      sym: li.dataset.sym,
+      name: li.dataset.name,
+      matchKeyword: NAME_HINTS[li.dataset.sym] || '',
+      price: li.querySelector('.price').textContent,
+      chg: chgEl.textContent,
+      chgClass: chgEl.classList.contains('up') ? 'up' : 'down'
+    });
+  });
+  return items;
+}
+
+function persistWatchlist(){
+  try{ localStorage.setItem(WATCHLIST_STORE_KEY, JSON.stringify(serializeWatchlist())); }catch(e){}
+}
+
+// On first-ever visit there's nothing saved yet -- snapshot the hardcoded demo rows as the
+// initial saved state so from this point on localStorage is always the source of truth.
+function hydratePortfolioFromStorage(){
+  var raw = null;
+  try{ raw = localStorage.getItem(PORTFOLIO_STORE_KEY); }catch(e){}
+  if(!raw){ persistPortfolio(); return; }
+  var items;
+  try{ items = JSON.parse(raw); }catch(e){ return; }
+  ['portfolioStocks', 'portfolioETFs', 'portfolioFunds'].forEach(function(id){ document.getElementById(id).innerHTML = ''; });
+  items.forEach(function(it){
+    var li = buildPortfolioLi(it.sym, it.name, it.type, it.price, it.chg, it.chgClass);
+    li.querySelector('.qty-display').textContent = it.shares + ' sh';
+    li.querySelector('.val-display').textContent = '$' + Number(it.invested).toLocaleString();
+    document.getElementById(GROUP_LIST_IDS[it.type] || 'portfolioStocks').appendChild(li);
+    if(it.matchKeyword){ PORTFOLIO_MATCH[it.sym] = it.matchKeyword; NAME_HINTS[it.sym] = it.matchKeyword; }
+  });
+}
+
+function hydrateWatchlistFromStorage(){
+  var raw = null;
+  try{ raw = localStorage.getItem(WATCHLIST_STORE_KEY); }catch(e){}
+  if(!raw){ persistWatchlist(); return; }
+  var items;
+  try{ items = JSON.parse(raw); }catch(e){ return; }
+  document.getElementById('watchlistList').innerHTML = '';
+  items.forEach(function(it){
+    var li = buildWatchlistLi(it.sym, it.name, it.price, it.chg, it.chgClass);
+    document.getElementById('watchlistList').appendChild(li);
+    if(it.matchKeyword){ WATCHLIST_MATCH[it.sym] = it.matchKeyword; NAME_HINTS[it.sym] = it.matchKeyword; }
+  });
+}
+
+hydratePortfolioFromStorage();
+hydrateWatchlistFromStorage();
+
+// ---- Ticker-tape chips on the Portfolio/Watchlist tabs: previously static mock data with
+// no connection to actual holdings. Now mirrors the real list rows (sym/price/chg) and each
+// chip opens that stock's detail page, same as tapping the row in Manage. ----
+function buildTickerChips(lis){
+  var html = '';
+  lis.forEach(function(li){
+    var chgEl = li.querySelector('.chg');
+    var chgClass = chgEl.classList.contains('up') ? 'up' : 'down';
+    var pctDisplay = chgEl.textContent.replace(/^[+-]/, '');
+    var arrow = chgClass === 'up' ? '▲' : '▼';
+    html += '<button type="button" class="tick" onclick="openStockDetailBySymbol(\'' + li.dataset.sym + '\')">' +
+      '<b>' + li.dataset.sym + '</b> ' + li.querySelector('.price').textContent +
+      ' <i class="' + chgClass + '">' + arrow + pctDisplay + '</i></button>';
+  });
+  return html;
+}
+
+function syncTickerTape(trackId, selector){
+  var track = document.getElementById(trackId);
+  if(!track) return;
+  var lis = Array.prototype.slice.call(document.querySelectorAll(selector));
+  if(!lis.length){ track.innerHTML = ''; return; }
+  var html = buildTickerChips(lis);
+  track.innerHTML = html + html; // doubled for the seamless scroll loop
+}
+
+function syncAllTickerTapes(){
+  syncTickerTape('portfolioTickerTrack', '#portfolioStocks [data-sym], #portfolioETFs [data-sym], #portfolioFunds [data-sym]');
+  syncTickerTape('watchlistTickerTrack', '#watchlistList [data-sym]');
+}
+
+syncAllTickerTapes();
 
 // ---- Real quotes, fetched from the same Worker (Finnhub under the hood) ----
 function fetchQuote(sym){
@@ -338,6 +589,9 @@ function loadQuotes(){
     .then(function(data){
       var quotes = data.quotes || {};
       rows.forEach(function(li){ applyQuoteToLi(li, quotes[li.dataset.sym]); });
+      syncAllTickerTapes();
+      persistPortfolio();
+      persistWatchlist();
     })
     .catch(function(){ /* leave existing values in place rather than show an error for every row */ });
 }

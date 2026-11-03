@@ -4,6 +4,7 @@
 //   GET /explain?symbol=NVDA&name=Nvidia  -> a grounded "why is it moving" summary via Workers AI
 //   GET /earnings?symbols=AAPL,MSFT  -> each symbol's next real earnings-call date via Finnhub
 //   GET /company-news?symbols=AAPL,MSFT  -> real per-company articles via Finnhub (last 10 days)
+//   GET /candles?symbol=AAPL&range=1D|5D|3M|6M|1Y|ALL  -> historical close prices via Twelve Data
 //   POST /spotify/token  {code, redirect_uri}  -> exchanges an OAuth code for Spotify tokens
 //   GET /spotify/shows?refresh_token=...  -> the user's real followed shows + latest episode
 //   POST /push/subscribe  {subscription, symbols}  -> save/update this device's push subscription
@@ -14,6 +15,11 @@
 //
 // Requires these set in the Cloudflare dashboard (Worker > Settings):
 //   - Secret "FINNHUB_API_KEY": a free key from finnhub.io
+//   - Secret "TWELVEDATA_API_KEY": a free key from twelvedata.com (used only for /candles --
+//     Finnhub's free tier doesn't include historical candles at all, confirmed via Finnhub's
+//     own docs and independent reports of free keys getting a 403 on /stock/candle. Twelve
+//     Data's free Basic plan (800 requests/day, 8/min) covers intraday and daily/weekly
+//     history, which is enough for one person's single-ticker chart views.)
 //   - Binding "AI": the built-in Workers AI binding (free tier, no extra signup)
 //   - Secret "SPOTIFY_CLIENT_SECRET": from the app registered at developer.spotify.com/dashboard
 //   - Secret "VAPID_PRIVATE_KEY": generated alongside VAPID_PUBLIC_KEY below, for Web Push
@@ -63,6 +69,7 @@ export default {
       if (url.pathname === '/explain') return await handleExplain(url, env);
       if (url.pathname === '/earnings') return await handleEarnings(url, env);
       if (url.pathname === '/company-news') return await handleCompanyNews(url, env);
+      if (url.pathname === '/candles') return await handleCandles(url, env);
       if (url.pathname === '/spotify/token' && request.method === 'POST') return await handleSpotifyToken(request, env);
       if (url.pathname === '/spotify/shows') return await handleSpotifyShows(url, env);
       if (url.pathname === '/push/subscribe' && request.method === 'POST') return await handlePushSubscribe(request, env);
@@ -273,6 +280,42 @@ async function handleCompanyNews(url, env) {
   const perSymbol = await Promise.all(symbols.map((sym) => fetchCompanyNews(sym, env)));
   const items = perSymbol.flat().sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
   return json({ items }, 200, 300);
+}
+
+// ---- /candles (historical close prices via Twelve Data -- see note at top on why not Finnhub) ----
+
+const CANDLE_RANGE_CONFIG = {
+  '1D': { interval: '5min', outputsize: 80, cacheSeconds: 120 },
+  '5D': { interval: '30min', outputsize: 65, cacheSeconds: 300 },
+  '3M': { interval: '1day', outputsize: 65, cacheSeconds: 1800 },
+  '6M': { interval: '1day', outputsize: 130, cacheSeconds: 1800 },
+  '1Y': { interval: '1day', outputsize: 252, cacheSeconds: 1800 },
+  'ALL': { interval: '1week', outputsize: 5000, cacheSeconds: 3600 }
+};
+
+async function handleCandles(url, env) {
+  const symbol = (url.searchParams.get('symbol') || '').trim().toUpperCase();
+  const range = (url.searchParams.get('range') || '1D').trim().toUpperCase();
+  const config = CANDLE_RANGE_CONFIG[range] || CANDLE_RANGE_CONFIG['1D'];
+  if (!symbol) return json({ error: 'symbol required' }, 400);
+  if (!env.TWELVEDATA_API_KEY) return json({ error: 'TWELVEDATA_API_KEY not configured' }, 500);
+
+  try {
+    const apiUrl = 'https://api.twelvedata.com/time_series?symbol=' + encodeURIComponent(symbol) +
+      '&interval=' + config.interval + '&outputsize=' + config.outputsize + '&apikey=' + env.TWELVEDATA_API_KEY;
+    const res = await fetch(apiUrl);
+    const data = await res.json();
+    if (!data.values) return json({ points: [], error: data.message || 'no data available' }, 200, 60);
+
+    // Twelve Data returns newest-first; the chart wants oldest-first.
+    const points = data.values
+      .map((v) => ({ t: v.datetime, c: parseFloat(v.close) }))
+      .filter((p) => !isNaN(p.c))
+      .reverse();
+    return json({ points }, 200, config.cacheSeconds);
+  } catch (err) {
+    return json({ points: [], error: String(err) }, 200, 60);
+  }
 }
 
 // ---- /explain (news match + Workers AI, grounded only) ----

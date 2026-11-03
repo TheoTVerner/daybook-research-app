@@ -62,22 +62,7 @@
     <!-- PORTFOLIO -->
     <section class="panel" id="panel-portfolio" hidden>
       <div class="ticker-tape" aria-label="Portfolio holdings">
-        <div class="ticker-track fast">
-          <span class="tick"><b>AAPL</b> 227.41 <i class="up">▲0.8%</i></span>
-          <span class="tick"><b>MSFT</b> 421.07 <i class="up">▲0.4%</i></span>
-          <span class="tick"><b>NVDA</b> 138.56 <i class="up">▲2.3%</i></span>
-          <span class="tick"><b>AMZN</b> 186.20 <i class="down">▼0.3%</i></span>
-          <span class="tick"><b>JPM</b> 231.88 <i class="up">▲0.6%</i></span>
-          <span class="tick"><b>VOO</b> 512.30 <i class="up">▲0.5%</i></span>
-          <span class="tick"><b>FXAIX</b> 189.44 <i class="up">▲0.5%</i></span>
-          <span class="tick"><b>AAPL</b> 227.41 <i class="up">▲0.8%</i></span>
-          <span class="tick"><b>MSFT</b> 421.07 <i class="up">▲0.4%</i></span>
-          <span class="tick"><b>NVDA</b> 138.56 <i class="up">▲2.3%</i></span>
-          <span class="tick"><b>AMZN</b> 186.20 <i class="down">▼0.3%</i></span>
-          <span class="tick"><b>JPM</b> 231.88 <i class="up">▲0.6%</i></span>
-          <span class="tick"><b>VOO</b> 512.30 <i class="up">▲0.5%</i></span>
-          <span class="tick"><b>FXAIX</b> 189.44 <i class="up">▲0.5%</i></span>
-        </div>
+        <div class="ticker-track fast" id="portfolioTickerTrack"></div>
       </div>
       <p class="section-label first">News on Your Holdings</p>
       <div class="stories-container" id="portfolioStories">
@@ -88,16 +73,7 @@
     <!-- WATCHLIST -->
     <section class="panel" id="panel-watchlist" hidden>
       <div class="ticker-tape" aria-label="Watchlist">
-        <div class="ticker-track fast">
-          <span class="tick"><b>TSLA</b> 248.12 <i class="down">▼1.4%</i></span>
-          <span class="tick"><b>PLTR</b> 41.77 <i class="up">▲3.2%</i></span>
-          <span class="tick"><b>COIN</b> 198.45 <i class="up">▲4.6%</i></span>
-          <span class="tick"><b>SOFI</b> 10.92 <i class="up">▲1.1%</i></span>
-          <span class="tick"><b>TSLA</b> 248.12 <i class="down">▼1.4%</i></span>
-          <span class="tick"><b>PLTR</b> 41.77 <i class="up">▲3.2%</i></span>
-          <span class="tick"><b>COIN</b> 198.45 <i class="up">▲4.6%</i></span>
-          <span class="tick"><b>SOFI</b> 10.92 <i class="up">▲1.1%</i></span>
-        </div>
+        <div class="ticker-track fast" id="watchlistTickerTrack"></div>
       </div>
       <p class="section-label first">News on Your Watchlist</p>
       <div class="stories-container" id="watchlistStories">
@@ -232,10 +208,32 @@
         <span class="edit-price" id="editPrice">$227.41</span>
         <span class="edit-chg up" id="editChg">+0.8%</span>
       </div>
+      <div class="edit-chart">
+        <div class="chart-tabs" id="chartTabs">
+          <button type="button" class="chart-tab active" data-range="1D">1D</button>
+          <button type="button" class="chart-tab" data-range="5D">5D</button>
+          <button type="button" class="chart-tab" data-range="3M">3M</button>
+          <button type="button" class="chart-tab" data-range="6M">6M</button>
+          <button type="button" class="chart-tab" data-range="1Y">1Y</button>
+          <button type="button" class="chart-tab" data-range="ALL">ALL</button>
+        </div>
+        <div class="chart-wrap">
+          <svg id="chartSvg" viewBox="0 0 320 120" preserveAspectRatio="none"></svg>
+          <p class="chart-loading" id="chartLoading">Loading chart…</p>
+        </div>
+      </div>
       <div class="edit-explain">
         <p class="edit-explain-label">Today's Move</p>
         <p class="edit-explain-text" id="editExplainText">Loading…</p>
         <ul class="edit-explain-sources" id="editExplainSources"></ul>
+      </div>
+      <div class="edit-research">
+        <p class="edit-explain-label">My Research</p>
+        <textarea class="research-textarea" id="researchNotesInput" rows="5" placeholder="Add your own notes on this company — thesis, risks, anything you want to remember."></textarea>
+        <div class="research-actions">
+          <button type="button" class="btn btn-outline" onclick="saveResearchNotes()">Save Notes</button>
+          <span class="research-saved-hint" id="researchSavedHint" hidden>Saved</span>
+        </div>
       </div>
       <div class="edit-fields" id="editFieldsWrap">
         <label class="edit-field">
