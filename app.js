@@ -629,16 +629,62 @@ function createPodcastCard(show, variantIndex){
   return card;
 }
 
+// Fetched directly from Apple's iTunes Lookup API (not via the Worker): Apple returns
+// access-control-allow-origin:* on this endpoint, meaning it's meant to be called from a
+// browser -- and it 403s Cloudflare Workers' shared IP range, so this must run client-side.
+var PODCAST_SHOWS = [
+  { name: 'In Good Company', appleId: 1614211565 },
+  { name: 'Wall Street Breakfast', appleId: 1358381502 },
+  { name: 'Goldman Sachs Exchanges', appleId: 948913991 },
+  { name: 'WSJ Tech News Briefing', appleId: 74844126 },
+  { name: 'Odd Lots', appleId: 1056200096 },
+  { name: 'Planet Money', appleId: 290783428 },
+  { name: 'Motley Fool Money', appleId: 1118867383 }
+];
+
+function fetchApplePodcastEpisode(show){
+  var url = 'https://itunes.apple.com/lookup?id=' + show.appleId + '&entity=podcastEpisode&limit=1';
+  return fetch(url)
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      var results = data.results || [];
+      var episode = results.filter(function(r){ return r.kind === 'podcast-episode'; })[0];
+      var showEntry = results.filter(function(r){ return r.kind === 'podcast'; })[0];
+      if(episode){
+        return {
+          name: show.name,
+          episode: {
+            title: episode.trackName || null,
+            publishedAt: episode.releaseDate || null,
+            link: episode.trackViewUrl || null,
+            image: episode.artworkUrl600 || episode.artworkUrl100 || null
+          }
+        };
+      }
+      if(showEntry){
+        return {
+          name: show.name,
+          episode: {
+            title: null,
+            publishedAt: null,
+            link: showEntry.collectionViewUrl || null,
+            image: showEntry.artworkUrl600 || showEntry.artworkUrl100 || null
+          }
+        };
+      }
+      return { name: show.name, episode: null };
+    })
+    .catch(function(){ return { name: show.name, episode: null }; });
+}
+
 function loadPodcastFeeds(){
   var hasSpotify = false;
   try{ hasSpotify = !!localStorage.getItem(SPOTIFY_TOKEN_KEY); }catch(e){}
   if(hasSpotify) return; // real connected Spotify data takes priority when present
 
   var row = document.getElementById('podcastRow');
-  fetch(NEWS_API + 'podcasts')
-    .then(function(res){ return res.json(); })
-    .then(function(data){
-      var shows = data.shows || [];
+  Promise.all(PODCAST_SHOWS.map(fetchApplePodcastEpisode))
+    .then(function(shows){
       if(!shows.length){ emptyState(row, "Couldn't load podcasts right now."); return; }
       row.innerHTML = '';
       shows.forEach(function(show, i){ row.appendChild(createPodcastCard(show, i)); });

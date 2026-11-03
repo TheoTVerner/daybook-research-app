@@ -6,7 +6,6 @@
 //   GET /company-news?symbols=AAPL,MSFT  -> real per-company articles via Finnhub (last 10 days)
 //   POST /spotify/token  {code, redirect_uri}  -> exchanges an OAuth code for Spotify tokens
 //   GET /spotify/shows?refresh_token=...  -> the user's real followed shows + latest episode
-//   GET /podcasts  -> latest real episode for a fixed, curated list of shows (no login needed)
 //   POST /push/subscribe  {subscription, symbols}  -> save/update this device's push subscription
 //   POST /push/unsubscribe  {endpoint}  -> remove a stored subscription
 //   POST /push/test  -> immediately sends one test push to the stored subscription
@@ -36,21 +35,9 @@ const SPOTIFY_CLIENT_ID = 'REPLACE_WITH_YOUR_SPOTIFY_CLIENT_ID';
 const VAPID_PUBLIC_KEY = 'BIm-iTQBPacSFStOaDaOL-Vgp64I-_0dlw4rJVGG_OiRTi1nk5f8CBYNdZ1Dw7MhtDi_IMUpSt5HBGSE_7JNAz8';
 const VAPID_SUBJECT = 'https://theotverner.github.io/daybook-research-app/';
 
-// Curated, not auto-synced from anywhere -- verified live before adding (same way
-// WSJ/Reuters/Yahoo Finance's dead news feeds were ruled out). appleId is each show's Apple
-// Podcasts collectionId (found via itunes.apple.com/search) -- using Apple's own lookup API
-// instead of parsing each show's raw RSS feed means the "listen" link is always a real
-// podcasts.apple.com episode deep link, not whatever random page a feed's <link> tag happens
-// to point to (several pointed at a plain company website instead of a podcast app).
-const PODCASTS = [
-  { name: 'In Good Company', appleId: 1614211565 },
-  { name: 'Wall Street Breakfast', appleId: 1358381502 },
-  { name: 'Goldman Sachs Exchanges', appleId: 948913991 },
-  { name: 'WSJ Tech News Briefing', appleId: 74844126 },
-  { name: 'Odd Lots', appleId: 1056200096 },
-  { name: 'Planet Money', appleId: 290783428 },
-  { name: 'Motley Fool Money', appleId: 1118867383 }
-];
+// Podcast lookups against itunes.apple.com now happen client-side, in app.js -- Apple
+// returns access-control-allow-origin:* on that endpoint (meant to be called from a browser)
+// and 403s Cloudflare Workers' shared egress IPs, so this Worker can't do that fetch reliably.
 
 // id values are stable keys the client uses to say which sources are enabled (?sources=nyt,cnbc).
 // WSJ and Yahoo Finance are deliberately excluded: WSJ's feeds are dead (frozen since Jan 2025,
@@ -78,7 +65,6 @@ export default {
       if (url.pathname === '/company-news') return await handleCompanyNews(url, env);
       if (url.pathname === '/spotify/token' && request.method === 'POST') return await handleSpotifyToken(request, env);
       if (url.pathname === '/spotify/shows') return await handleSpotifyShows(url, env);
-      if (url.pathname === '/podcasts') return await handlePodcasts();
       if (url.pathname === '/push/subscribe' && request.method === 'POST') return await handlePushSubscribe(request, env);
       if (url.pathname === '/push/unsubscribe' && request.method === 'POST') return await handlePushUnsubscribe(request, env);
       if (url.pathname === '/push/test' && request.method === 'POST') return await handlePushTest(env);
@@ -439,56 +425,6 @@ async function handleSpotifyShows(url, env) {
   }));
 
   return json({ shows }, 200, 300);
-}
-
-// ---- /podcasts (curated show list, no login) ----
-
-async function handlePodcasts() {
-  const shows = await Promise.all(PODCASTS.map(fetchPodcastLatest));
-  return json({ shows }, 200, 1800);
-}
-
-async function fetchPodcastLatest(show) {
-  try {
-    const res = await fetch(`https://itunes.apple.com/lookup?id=${show.appleId}&entity=podcastEpisode&limit=1`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36' }
-    });
-    if (!res.ok) return { name: show.name, episode: null, debug: 'HTTP ' + res.status };
-    const data = await res.json();
-    const results = data.results || [];
-    const episode = results.find((r) => r.kind === 'podcast-episode');
-    const showEntry = results.find((r) => r.kind === 'podcast');
-
-    if (!episode) {
-      // Fall back to the show's own artwork/page so the thumbnail isn't empty even when
-      // today's specific episode can't be resolved.
-      if (showEntry) {
-        return {
-          name: show.name,
-          episode: {
-            title: null,
-            publishedAt: null,
-            link: showEntry.collectionViewUrl || null,
-            image: showEntry.artworkUrl600 || showEntry.artworkUrl100 || null
-          },
-          debug: 'no podcast-episode entry, resultCount=' + results.length
-        };
-      }
-      return { name: show.name, episode: null, debug: 'resultCount=' + results.length };
-    }
-
-    return {
-      name: show.name,
-      episode: {
-        title: episode.trackName || null,
-        publishedAt: episode.releaseDate || null,
-        link: episode.trackViewUrl || null,
-        image: episode.artworkUrl600 || episode.artworkUrl100 || null
-      }
-    };
-  } catch (err) {
-    return { name: show.name, episode: null, debug: String(err) };
-  }
 }
 
 // ---- /push/* (Web Push subscription management + earnings-reminder logic) ----
