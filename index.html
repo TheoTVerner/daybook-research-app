@@ -217,9 +217,16 @@
           <button type="button" class="chart-tab" data-range="1Y">1Y</button>
           <button type="button" class="chart-tab" data-range="ALL">ALL</button>
         </div>
-        <div class="chart-wrap">
-          <svg id="chartSvg" viewBox="0 0 320 120" preserveAspectRatio="none"></svg>
-          <p class="chart-loading" id="chartLoading">Loading chart…</p>
+        <div class="chart-row">
+          <div class="chart-y-axis" id="chartYAxis"></div>
+          <div class="chart-plot">
+            <svg id="chartSvg" viewBox="0 0 320 120" preserveAspectRatio="none"></svg>
+            <p class="chart-loading" id="chartLoading">Loading chart…</p>
+          </div>
+        </div>
+        <div class="chart-row chart-x-row">
+          <div class="chart-y-axis-spacer"></div>
+          <div class="chart-x-axis" id="chartXAxis"></div>
         </div>
       </div>
       <div class="edit-explain">

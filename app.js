@@ -219,6 +219,8 @@ function loadChart(sym, range){
   var svg = document.getElementById('chartSvg');
   var loading = document.getElementById('chartLoading');
   svg.innerHTML = '';
+  document.getElementById('chartYAxis').innerHTML = '';
+  document.getElementById('chartXAxis').innerHTML = '';
   loading.hidden = false;
   loading.textContent = 'Loading chart…';
   fetch(NEWS_API + 'candles?symbol=' + encodeURIComponent(sym) + '&range=' + encodeURIComponent(range))
@@ -226,13 +228,13 @@ function loadChart(sym, range){
     .then(function(data){
       var points = data.points || [];
       if(points.length < 2){ loading.textContent = 'No chart data available for this range.'; return; }
-      drawChart(points);
+      drawChart(points, range);
       loading.hidden = true;
     })
     .catch(function(){ loading.textContent = "Couldn't load chart data right now."; });
 }
 
-function drawChart(points){
+function drawChart(points, range){
   var svg = document.getElementById('chartSvg');
   var w = 320, h = 120, pad = 4;
   var closes = points.map(function(p){ return p.c; });
@@ -267,6 +269,55 @@ function drawChart(points){
   line.setAttribute('stroke-width', '2');
   line.setAttribute('vector-effect', 'non-scaling-stroke');
   svg.appendChild(line);
+
+  renderChartAxes(points, min, max, range);
+}
+
+// Axis labels are plain HTML siblings of the SVG, not SVG <text> -- the chart's
+// preserveAspectRatio="none" stretches x and y independently (correct for a price-over-time
+// line), which would visibly distort any text drawn inside the SVG itself.
+function formatChartAxisPrice(val){
+  if(val >= 1000) return '$' + Math.round(val).toLocaleString();
+  if(val >= 10) return '$' + val.toFixed(1);
+  return '$' + val.toFixed(2);
+}
+
+var CHART_MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function formatChartAxisDate(t, range){
+  var hasTime = t.indexOf(' ') !== -1;
+  if(hasTime){
+    var timeParts = t.split(' ')[1].split(':');
+    var hh = parseInt(timeParts[0], 10);
+    var h12 = hh % 12; if(h12 === 0) h12 = 12;
+    return h12 + ':' + timeParts[1] + (hh >= 12 ? ' PM' : ' AM');
+  }
+  var dateParts = t.split('-');
+  var month = CHART_MONTH_ABBR[parseInt(dateParts[1], 10) - 1];
+  if(range === '1Y' || range === 'ALL') return month + " '" + dateParts[0].slice(2);
+  return month + ' ' + parseInt(dateParts[2], 10);
+}
+
+function renderChartAxes(points, min, max, range){
+  var yAxis = document.getElementById('chartYAxis');
+  yAxis.innerHTML = '';
+  [max, (min + max) / 2, min].forEach(function(val){
+    var span = document.createElement('span');
+    span.textContent = formatChartAxisPrice(val);
+    yAxis.appendChild(span);
+  });
+
+  var xAxis = document.getElementById('chartXAxis');
+  xAxis.innerHTML = '';
+  var n = points.length;
+  var idxs = n <= 4
+    ? points.map(function(_, i){ return i; })
+    : [0, Math.round((n - 1) / 3), Math.round((2 * (n - 1)) / 3), n - 1];
+  idxs.forEach(function(idx){
+    var span = document.createElement('span');
+    span.textContent = formatChartAxisDate(points[idx].t, range);
+    xAxis.appendChild(span);
+  });
 }
 
 var chartTabsEl = document.getElementById('chartTabs');
