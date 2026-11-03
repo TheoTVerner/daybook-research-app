@@ -1,12 +1,15 @@
-// Daybook backend — one Cloudflare Worker, four routes:
+// Daybook backend — one Cloudflare Worker, these routes:
 //   GET /            -> real news headlines (NYT, MarketWatch, CNBC RSS, server-side to dodge CORS)
 //   GET /quotes?symbols=AAPL,MSFT  -> real price + day change + company name via Finnhub (free tier)
 //   GET /explain?symbol=NVDA&name=Nvidia  -> a grounded "why is it moving" summary via Workers AI
 //   GET /earnings?symbols=AAPL,MSFT  -> each symbol's next real earnings-call date via Finnhub
+//   POST /spotify/token  {code, redirect_uri}  -> exchanges an OAuth code for Spotify tokens
+//   GET /spotify/shows?refresh_token=...  -> the user's real followed shows + latest episode
 //
-// Requires two things set in the Cloudflare dashboard (Worker > Settings):
+// Requires these set in the Cloudflare dashboard (Worker > Settings):
 //   - Secret "FINNHUB_API_KEY": a free key from finnhub.io
 //   - Binding "AI": the built-in Workers AI binding (free tier, no extra signup)
+//   - Secret "SPOTIFY_CLIENT_SECRET": from the app registered at developer.spotify.com/dashboard
 //
 // Reuters shut down its public RSS feeds a few years back and Yahoo Finance never
 // offered an official API, so neither is included. Dow Jones' WSJ feeds
@@ -14,6 +17,9 @@
 // frozen at January 2025. NYT, MarketWatch, and CNBC all still run active public feeds.
 
 const ALLOWED_ORIGIN = 'https://theotverner.github.io';
+
+// Not secret (Spotify Client IDs are public by design) -- set once you've registered the app.
+const SPOTIFY_CLIENT_ID = 'REPLACE_WITH_YOUR_SPOTIFY_CLIENT_ID';
 
 const FEEDS = [
   { source: 'The New York Times', url: 'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml' },
@@ -33,6 +39,8 @@ export default {
       if (url.pathname === '/quotes') return await handleQuotes(url, env);
       if (url.pathname === '/explain') return await handleExplain(url, env);
       if (url.pathname === '/earnings') return await handleEarnings(url, env);
+      if (url.pathname === '/spotify/token' && request.method === 'POST') return await handleSpotifyToken(request, env);
+      if (url.pathname === '/spotify/shows') return await handleSpotifyShows(url, env);
       return await handleNews();
     } catch (err) {
       return json({ error: String(err) }, 500);
@@ -43,7 +51,7 @@ export default {
 function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type'
   };
 }
@@ -225,4 +233,103 @@ async function handleExplain(url, env) {
       sources: matches.map((m) => ({ title: m.title, source: m.source, link: m.link }))
     }, 200, 60);
   }
+}
+
+// ---- /spotify/token and /spotify/shows ----
+
+async function handleSpotifyToken(request, env) {
+  if (!env.SPOTIFY_CLIENT_SECRET) return json({ error: 'SPOTIFY_CLIENT_SECRET not configured' }, 500);
+  let body;
+  try {
+    body = await request.json();
+  } catch (err) {
+    return json({ error: 'invalid request body' }, 400);
+  }
+  const code = body && body.code;
+  const redirectUri = body && body.redirect_uri;
+  if (!code || !redirectUri) return json({ error: 'code and redirect_uri are required' }, 400);
+
+  const params = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: redirectUri,
+    client_id: SPOTIFY_CLIENT_ID,
+    client_secret: env.SPOTIFY_CLIENT_SECRET
+  });
+
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString()
+  });
+  const data = await res.json();
+  if (!res.ok) return json({ error: data.error_description || 'token exchange failed' }, 400);
+
+  return json({ access_token: data.access_token, refresh_token: data.refresh_token, expires_in: data.expires_in }, 200);
+}
+
+async function spotifyAccessTokenFromRefresh(refreshToken, env) {
+  const params = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+    client_id: SPOTIFY_CLIENT_ID,
+    client_secret: env.SPOTIFY_CLIENT_SECRET
+  });
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString()
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.access_token || null;
+}
+
+async function handleSpotifyShows(url, env) {
+  if (!env.SPOTIFY_CLIENT_SECRET) return json({ error: 'SPOTIFY_CLIENT_SECRET not configured' }, 500);
+  const refreshToken = url.searchParams.get('refresh_token');
+  if (!refreshToken) return json({ error: 'refresh_token is required' }, 400);
+
+  const accessToken = await spotifyAccessTokenFromRefresh(refreshToken, env);
+  if (!accessToken) return json({ error: 'could not refresh the Spotify session' }, 401);
+
+  const showsRes = await fetch('https://api.spotify.com/v1/me/shows?limit=20', {
+    headers: { Authorization: 'Bearer ' + accessToken }
+  });
+  if (!showsRes.ok) return json({ error: 'Spotify shows request failed' }, 502);
+  const showsData = await showsRes.json();
+  const items = (showsData && showsData.items) || [];
+
+  const shows = await Promise.all(items.map(async (entry) => {
+    const show = entry.show;
+    let latestEpisode = null;
+    try {
+      const epRes = await fetch(`https://api.spotify.com/v1/shows/${show.id}/episodes?limit=1`, {
+        headers: { Authorization: 'Bearer ' + accessToken }
+      });
+      if (epRes.ok) {
+        const epData = await epRes.json();
+        const ep = epData && epData.items && epData.items[0];
+        if (ep) {
+          latestEpisode = {
+            name: ep.name,
+            releaseDate: ep.release_date,
+            url: ep.external_urls && ep.external_urls.spotify
+          };
+        }
+      }
+    } catch (err) {
+      // leave latestEpisode null, the show itself still renders
+    }
+    return {
+      id: show.id,
+      name: show.name,
+      publisher: show.publisher,
+      image: (show.images && show.images[0] && show.images[0].url) || null,
+      url: show.external_urls && show.external_urls.spotify,
+      latestEpisode
+    };
+  }));
+
+  return json({ shows }, 200, 300);
 }

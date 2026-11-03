@@ -51,7 +51,7 @@
       </div>
 
       <p class="section-label first">From Your Spotify</p>
-      <div class="podcast-row">
+      <div class="podcast-row" id="podcastRow">
         <div class="podcast-card">
           <div class="pod-art v1"><span class="pod-mono">DMB</span><a class="play-btn" href="https://open.spotify.com/search/Daily%20Markets%20Briefing" target="_blank" rel="noopener" aria-label="Open in Spotify">▶</a></div>
           <p class="pod-title">Market Open: What Today's CPI Print Means for Rates</p>
@@ -184,9 +184,9 @@
           <div class="connector-info"><p class="connector-name">Reuters</p><p class="connector-type">News</p><span class="connector-status">Connected</span></div>
           <button class="connector-toggle" onclick="toggleConnector(this)">Disconnect</button>
         </div>
-        <div class="connector-card connected">
-          <div class="connector-info"><p class="connector-name">Spotify</p><p class="connector-type">Audio</p><span class="connector-status">Connected</span></div>
-          <button class="connector-toggle" onclick="toggleConnector(this)">Disconnect</button>
+        <div class="connector-card" id="spotifyConnectorCard">
+          <div class="connector-info"><p class="connector-name">Spotify</p><p class="connector-type">Audio</p><span class="connector-status">Not connected</span></div>
+          <button class="connector-toggle" onclick="handleSpotifyConnectorClick(this)">Connect</button>
         </div>
         <div class="connector-card">
           <div class="connector-info"><p class="connector-name">Bloomberg</p><p class="connector-type">News &amp; Data</p><span class="connector-status">Not connected</span></div>

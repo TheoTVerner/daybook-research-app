@@ -1,4 +1,7 @@
 var NEWS_API = 'https://daybook-research.ttverner.workers.dev/';
+var SPOTIFY_CLIENT_ID = 'REPLACE_WITH_YOUR_SPOTIFY_CLIENT_ID';
+var SPOTIFY_REDIRECT_URI = 'https://theotverner.github.io/daybook-research-app/';
+var SPOTIFY_TOKEN_KEY = 'daybook_spotify_refresh_token';
 
 function collectHeldSymbols(){
   var rows = document.querySelectorAll('#portfolioStocks [data-sym], #portfolioETFs [data-sym], #portfolioFunds [data-sym], #watchlistList [data-sym]');
@@ -408,6 +411,132 @@ function loadNews(){
 loadNews();
 loadQuotes();
 buildCalendar();
+
+// ---- Spotify: real OAuth login, real followed shows ----
+
+function setSpotifyConnectorUI(connected){
+  var card = document.getElementById('spotifyConnectorCard');
+  if(!card) return;
+  card.classList.toggle('connected', connected);
+  var status = card.querySelector('.connector-status');
+  if(status) status.textContent = connected ? 'Connected' : 'Not connected';
+  var btn = card.querySelector('.connector-toggle');
+  if(btn) btn.textContent = connected ? 'Disconnect' : 'Connect';
+}
+
+function connectSpotify(){
+  var state = Math.random().toString(36).slice(2);
+  try{ sessionStorage.setItem('daybook_spotify_state', state); }catch(e){}
+  var params = new URLSearchParams({
+    client_id: SPOTIFY_CLIENT_ID,
+    response_type: 'code',
+    redirect_uri: SPOTIFY_REDIRECT_URI,
+    scope: 'user-library-read',
+    state: state
+  });
+  window.location.href = 'https://accounts.spotify.com/authorize?' + params.toString();
+}
+
+function disconnectSpotify(){
+  try{ localStorage.removeItem(SPOTIFY_TOKEN_KEY); }catch(e){}
+  setSpotifyConnectorUI(false);
+}
+
+function handleSpotifyConnectorClick(btn){
+  var connected = btn.closest('.connector-card').classList.contains('connected');
+  if(connected) disconnectSpotify(); else connectSpotify();
+}
+
+function createSpotifyShowCard(show){
+  var card = document.createElement('div');
+  card.className = 'podcast-card';
+
+  var art = document.createElement('div');
+  art.className = 'pod-art';
+  if(show.image){
+    var img = document.createElement('img');
+    img.className = 'pod-art-img';
+    img.src = show.image;
+    img.alt = show.name;
+    art.appendChild(img);
+  } else {
+    var mono = document.createElement('span');
+    mono.className = 'pod-mono';
+    mono.textContent = (show.name || '?').slice(0, 3).toUpperCase();
+    art.appendChild(mono);
+  }
+  var episodeUrl = (show.latestEpisode && show.latestEpisode.url) || show.url || 'https://open.spotify.com';
+  var play = document.createElement('a');
+  play.className = 'play-btn';
+  play.href = episodeUrl; play.target = '_blank'; play.rel = 'noopener';
+  play.textContent = '▶';
+  play.setAttribute('aria-label', 'Open in Spotify');
+  art.appendChild(play);
+  card.appendChild(art);
+
+  var title = document.createElement('p');
+  title.className = 'pod-title';
+  title.textContent = (show.latestEpisode && show.latestEpisode.name) || show.name;
+  var sub = document.createElement('p');
+  sub.className = 'pod-show';
+  sub.textContent = show.name;
+  card.appendChild(title);
+  card.appendChild(sub);
+  return card;
+}
+
+function loadSpotifyShows(){
+  var token = null;
+  try{ token = localStorage.getItem(SPOTIFY_TOKEN_KEY); }catch(e){}
+  if(!token) return;
+  fetch(NEWS_API + 'spotify/shows?refresh_token=' + encodeURIComponent(token))
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      if(!data.shows || !data.shows.length) return;
+      var row = document.getElementById('podcastRow');
+      row.innerHTML = '';
+      data.shows.forEach(function(show){ row.appendChild(createSpotifyShowCard(show)); });
+    })
+    .catch(function(){ /* leave the placeholder cards in place */ });
+}
+
+function handleSpotifyCallback(){
+  var params = new URLSearchParams(window.location.search);
+  var code = params.get('code');
+  var state = params.get('state');
+  if(!code) return;
+
+  var expectedState = null;
+  try{ expectedState = sessionStorage.getItem('daybook_spotify_state'); sessionStorage.removeItem('daybook_spotify_state'); }catch(e){}
+  // Clear the query string either way so a refresh never tries to reuse a spent code.
+  window.history.replaceState({}, document.title, window.location.pathname);
+  if(!state || state !== expectedState) return;
+
+  fetch(NEWS_API + 'spotify/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: code, redirect_uri: SPOTIFY_REDIRECT_URI })
+  })
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      if(data.refresh_token){
+        try{ localStorage.setItem(SPOTIFY_TOKEN_KEY, data.refresh_token); }catch(e){}
+        setSpotifyConnectorUI(true);
+        loadSpotifyShows();
+      }
+    })
+    .catch(function(){});
+}
+
+handleSpotifyCallback();
+(function(){
+  var hasToken = false;
+  try{ hasToken = !!localStorage.getItem(SPOTIFY_TOKEN_KEY); }catch(e){}
+  if(hasToken){
+    setSpotifyConnectorUI(true);
+    loadSpotifyShows();
+  }
+})();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
