@@ -450,11 +450,32 @@ async function handlePodcasts() {
 
 async function fetchPodcastLatest(show) {
   try {
-    const res = await fetch(`https://itunes.apple.com/lookup?id=${show.appleId}&entity=podcastEpisode&limit=1`);
-    if (!res.ok) return { name: show.name, episode: null };
+    const res = await fetch(`https://itunes.apple.com/lookup?id=${show.appleId}&entity=podcastEpisode&limit=1`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36' }
+    });
+    if (!res.ok) return { name: show.name, episode: null, debug: 'HTTP ' + res.status };
     const data = await res.json();
-    const episode = (data.results || []).find((r) => r.kind === 'podcast-episode');
-    if (!episode) return { name: show.name, episode: null };
+    const results = data.results || [];
+    const episode = results.find((r) => r.kind === 'podcast-episode');
+    const showEntry = results.find((r) => r.kind === 'podcast');
+
+    if (!episode) {
+      // Fall back to the show's own artwork/page so the thumbnail isn't empty even when
+      // today's specific episode can't be resolved.
+      if (showEntry) {
+        return {
+          name: show.name,
+          episode: {
+            title: null,
+            publishedAt: null,
+            link: showEntry.collectionViewUrl || null,
+            image: showEntry.artworkUrl600 || showEntry.artworkUrl100 || null
+          },
+          debug: 'no podcast-episode entry, resultCount=' + results.length
+        };
+      }
+      return { name: show.name, episode: null, debug: 'resultCount=' + results.length };
+    }
 
     return {
       name: show.name,
@@ -466,7 +487,7 @@ async function fetchPodcastLatest(show) {
       }
     };
   } catch (err) {
-    return { name: show.name, episode: null };
+    return { name: show.name, episode: null, debug: String(err) };
   }
 }
 
