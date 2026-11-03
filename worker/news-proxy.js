@@ -3,6 +3,7 @@
 //   GET /quotes?symbols=AAPL,MSFT  -> real price + day change + company name via Finnhub (free tier)
 //   GET /explain?symbol=NVDA&name=Nvidia  -> a grounded "why is it moving" summary via Workers AI
 //   GET /earnings?symbols=AAPL,MSFT  -> each symbol's next real earnings-call date via Finnhub
+//   GET /company-news?symbols=AAPL,MSFT  -> real per-company articles via Finnhub (last 10 days)
 //   POST /spotify/token  {code, redirect_uri}  -> exchanges an OAuth code for Spotify tokens
 //   GET /spotify/shows?refresh_token=...  -> the user's real followed shows + latest episode
 //   GET /podcasts  -> latest real episode for a fixed, curated list of shows (no login needed)
@@ -74,6 +75,7 @@ export default {
       if (url.pathname === '/quotes') return await handleQuotes(url, env);
       if (url.pathname === '/explain') return await handleExplain(url, env);
       if (url.pathname === '/earnings') return await handleEarnings(url, env);
+      if (url.pathname === '/company-news') return await handleCompanyNews(url, env);
       if (url.pathname === '/spotify/token' && request.method === 'POST') return await handleSpotifyToken(request, env);
       if (url.pathname === '/spotify/shows') return await handleSpotifyShows(url, env);
       if (url.pathname === '/podcasts') return await handlePodcasts();
@@ -253,6 +255,40 @@ async function handleEarnings(url, env) {
   return json({ earnings }, 200, 3600);
 }
 
+// ---- /company-news (Finnhub, real per-company articles) ----
+
+async function fetchCompanyNews(sym, env) {
+  const to = new Date();
+  const from = new Date(to.getTime() - 10 * 24 * 60 * 60 * 1000);
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  try {
+    const res = await fetch(`https://finnhub.io/api/v1/company-news?symbol=${encodeURIComponent(sym)}&from=${fmt(from)}&to=${fmt(to)}&token=${env.FINNHUB_API_KEY}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+    return data.slice(0, 8).map((item) => ({
+      source: item.source || 'Finnhub',
+      title: item.headline || '',
+      summary: (item.summary || '').slice(0, 220),
+      link: item.url || '',
+      publishedAt: item.datetime ? new Date(item.datetime * 1000).toISOString() : new Date().toISOString(),
+      symbol: sym
+    })).filter((item) => item.title && item.link);
+  } catch (err) {
+    return [];
+  }
+}
+
+async function handleCompanyNews(url, env) {
+  const symbols = (url.searchParams.get('symbols') || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+  if (!symbols.length) return json({ error: 'no symbols given' }, 400);
+  if (!env.FINNHUB_API_KEY) return json({ error: 'FINNHUB_API_KEY not configured' }, 500);
+
+  const perSymbol = await Promise.all(symbols.map((sym) => fetchCompanyNews(sym, env)));
+  const items = perSymbol.flat().sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+  return json({ items }, 200, 300);
+}
+
 // ---- /explain (news match + Workers AI, grounded only) ----
 
 async function handleExplain(url, env) {
@@ -260,14 +296,22 @@ async function handleExplain(url, env) {
   const name = (url.searchParams.get('name') || '').trim();
   if (!symbol || !name) return json({ error: 'symbol and name are required' }, 400);
 
-  const results = await Promise.all(FEEDS.map(fetchFeed));
-  const pool = results.flat();
-  const nameLower = name.toLowerCase();
-  const matches = pool.filter((item) => item.title.toLowerCase().includes(nameLower)).slice(0, 4);
+  // Prefer Finnhub's real per-company news (much better hit rate for anything beyond the
+  // largest names) and only fall back to matching the general market-news pool if Finnhub
+  // has nothing for this symbol.
+  let matches = env.FINNHUB_API_KEY ? await fetchCompanyNews(symbol, env) : [];
+  matches = matches.slice(0, 4);
+
+  if (matches.length === 0) {
+    const results = await Promise.all(FEEDS.map(fetchFeed));
+    const pool = results.flat();
+    const nameLower = name.toLowerCase();
+    matches = pool.filter((item) => item.title.toLowerCase().includes(nameLower)).slice(0, 4);
+  }
 
   if (matches.length === 0) {
     return json({
-      summary: 'No recent headlines mention ' + name + ' in the general market feeds this app pulls from — no grounded explanation available.',
+      summary: 'No recent headlines mention ' + name + ' in the feeds this app pulls from — no grounded explanation available.',
       sources: []
     }, 200, 300);
   }

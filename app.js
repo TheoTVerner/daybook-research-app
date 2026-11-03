@@ -10,6 +10,19 @@ function collectHeldSymbols(){
   return syms;
 }
 
+function collectSymbolsFrom(selector){
+  var rows = document.querySelectorAll(selector);
+  var syms = [];
+  rows.forEach(function(li){ if(syms.indexOf(li.dataset.sym) === -1) syms.push(li.dataset.sym); });
+  return syms;
+}
+function collectPortfolioSymbols(){
+  return collectSymbolsFrom('#portfolioStocks [data-sym], #portfolioETFs [data-sym], #portfolioFunds [data-sym]');
+}
+function collectWatchlistSymbols(){
+  return collectSymbolsFrom('#watchlistList [data-sym]');
+}
+
 function switchTab(name){
   document.querySelectorAll('.panel').forEach(function(p){ p.hidden = p.id !== 'panel-' + name; });
   document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab === name); });
@@ -200,10 +213,13 @@ function saveEditOverlay(){
 }
 
 function removeEditPosition(){
+  var wasWatchlist = currentEditLi && !!currentEditLi.closest('#watchlistList');
   if(currentEditLi) currentEditLi.remove();
   closeEditOverlay();
   buildCalendar();
   syncPushSymbols();
+  if(wasWatchlist) loadCompanyNews('watchlistStories', collectWatchlistSymbols(), WATCHLIST_MATCH, 'watchlist');
+  else loadCompanyNews('portfolioStories', collectPortfolioSymbols(), PORTFOLIO_MATCH, 'holdings');
 }
 
 function toggleConnector(btn){
@@ -246,7 +262,7 @@ addForm.addEventListener('submit', function(e){
         '<button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button>';
       document.getElementById(GROUP_LIST_IDS[type]).appendChild(li1);
       PORTFOLIO_MATCH[sym] = matchKeyword;
-      renderFilteredStories('portfolioStories', PORTFOLIO_MATCH, 'holdings');
+      loadCompanyNews('portfolioStories', collectPortfolioSymbols(), PORTFOLIO_MATCH, 'holdings');
     } else {
       var li2 = document.createElement('li');
       li2.dataset.sym = sym;
@@ -257,7 +273,7 @@ addForm.addEventListener('submit', function(e){
         '<button class="remove-btn" onclick="removeWatchlistRow(this)">✕</button>';
       document.getElementById('watchlistList').appendChild(li2);
       WATCHLIST_MATCH[sym] = matchKeyword;
-      renderFilteredStories('watchlistStories', WATCHLIST_MATCH, 'watchlist');
+      loadCompanyNews('watchlistStories', collectWatchlistSymbols(), WATCHLIST_MATCH, 'watchlist');
     }
     buildCalendar();
     syncPushSymbols();
@@ -268,6 +284,7 @@ function removeWatchlistRow(btn){
   btn.closest('li').remove();
   buildCalendar();
   syncPushSymbols();
+  loadCompanyNews('watchlistStories', collectWatchlistSymbols(), WATCHLIST_MATCH, 'watchlist');
 }
 
 // ---- Real news, fetched from the Cloudflare Worker RSS proxy ----
@@ -396,6 +413,33 @@ function renderFilteredStories(containerId, matchMap, label){
   matched.slice(0, 6).forEach(function(m){ container.appendChild(createStoryElement(m.item, m.sym)); });
 }
 
+// Real per-company articles via Finnhub -- much better coverage than matching your holdings
+// against general market headlines. Falls back to that general-pool match only if Finnhub
+// has nothing for any of the given symbols.
+function loadCompanyNews(containerId, symbols, fallbackMatchMap, label){
+  var container = document.getElementById(containerId);
+  if(!symbols.length){
+    emptyState(container, 'Add stocks to see news about them here.');
+    return;
+  }
+  fetch(NEWS_API + 'company-news?symbols=' + encodeURIComponent(symbols.join(',')))
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      var items = data.items || [];
+      if(items.length === 0){
+        renderFilteredStories(containerId, fallbackMatchMap, label);
+        return;
+      }
+      container.innerHTML = '';
+      items.slice(0, 8).forEach(function(item){
+        container.appendChild(createStoryElement(item, item.symbol));
+      });
+    })
+    .catch(function(){
+      renderFilteredStories(containerId, fallbackMatchMap, label);
+    });
+}
+
 var ALL_NEWS_SOURCES = ['nyt', 'marketwatch', 'cnbc', 'bloomberg', 'ft'];
 var NEWS_SOURCES_KEY = 'daybook_enabled_news_sources';
 
@@ -441,12 +485,15 @@ function applyNewsSourceCardStates(){
 }
 
 function loadNews(){
+  // Portfolio/Watchlist news comes primarily from Finnhub's per-company endpoint now, which
+  // doesn't depend on which general sources are enabled -- always load it regardless.
+  loadCompanyNews('portfolioStories', collectPortfolioSymbols(), PORTFOLIO_MATCH, 'holdings');
+  loadCompanyNews('watchlistStories', collectWatchlistSymbols(), WATCHLIST_MATCH, 'watchlist');
+
   var enabled = getEnabledNewsSources();
   if(enabled.length === 0){
     newsPool = [];
-    ['marketsStories', 'portfolioStories', 'watchlistStories'].forEach(function(id){
-      emptyState(document.getElementById(id), 'No news sources are connected. Turn one on in Manage → Connectors.');
-    });
+    emptyState(document.getElementById('marketsStories'), 'No news sources are connected. Turn one on in Manage → Connectors.');
     return;
   }
   var url = NEWS_API + '?sources=' + encodeURIComponent(enabled.join(','));
@@ -455,13 +502,9 @@ function loadNews(){
     .then(function(data){
       newsPool = data.items || [];
       renderMarketsStories();
-      renderFilteredStories('portfolioStories', PORTFOLIO_MATCH, 'holdings');
-      renderFilteredStories('watchlistStories', WATCHLIST_MATCH, 'watchlist');
     })
     .catch(function(){
-      ['marketsStories', 'portfolioStories', 'watchlistStories'].forEach(function(id){
-        emptyState(document.getElementById(id), "Couldn't load live headlines right now. Check your connection and reopen the app.");
-      });
+      emptyState(document.getElementById('marketsStories'), "Couldn't load live headlines right now. Check your connection and reopen the app.");
     });
 }
 applyNewsSourceCardStates();
