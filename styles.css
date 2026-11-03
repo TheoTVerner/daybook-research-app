@@ -134,14 +134,13 @@ body{
 .cal-time{ flex:none; color:var(--app-ink-soft); font-size:11px; }
 
 .tabbar{ flex:none; display:flex; align-items:stretch;
-  height:calc(40px + env(safe-area-inset-bottom,0px)); padding-bottom:env(safe-area-inset-bottom,0px);
   background:var(--app-navy); border-top:1px solid rgba(255,255,255,.08); }
-.tab{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none;
-  color:var(--app-silver); position:relative; padding:0; }
+.tab{ flex:1; box-sizing:content-box; height:40px; padding:0 0 env(safe-area-inset-bottom,0px) 0;
+  display:flex; align-items:center; justify-content:center; background:none; border:none;
+  color:var(--app-silver); position:relative; }
 .tab-icon-wrap{ display:flex; align-items:center; justify-content:center; width:100%; height:100%; }
 .tab svg{ width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:1.8; }
-.tab.active{ color:#fff; }
-.tab.active .tab-icon-wrap{ background:var(--app-crimson); border-radius:10px 10px 0 0; }
+.tab.active{ color:#fff; background:var(--app-crimson); border-radius:10px 10px 0 0; }
 
 /* ---- full-page position editor, styled like a trading terminal ---- */
 .edit-overlay[hidden]{ display:none; }
