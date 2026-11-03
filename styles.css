@@ -39,7 +39,7 @@ body{
 .tick{ display:inline-flex; align-items:baseline; gap:6px; padding:7px 16px; white-space:nowrap; font-family:'Barlow Condensed',sans-serif;
   font-size:13px; color:var(--terminal-fg); border-right:1px solid rgba(255,255,255,.08); font-variant-numeric:tabular-nums;
   background:none; border-top:none; border-bottom:none; border-left:none; }
-button.tick{ cursor:pointer; }
+button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-radius:0; margin:0; }
 .tick b{ color:var(--terminal-amber); font-weight:700; letter-spacing:.02em; }
 .tick i{ font-style:normal; font-weight:700; }
 .tick i.up{ color:#3ad17a; } .tick i.down{ color:#ff5f5f; }
