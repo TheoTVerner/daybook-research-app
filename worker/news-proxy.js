@@ -35,10 +35,15 @@ const PODCASTS = [
   { name: 'Motley Fool Money', url: 'https://www.omnycontent.com/d/playlist/820f09cf-2ace-4180-a92d-aa4c0008f5fb/c1c22a03-f4e2-49e4-9eff-abb2003ac099/25111702-47b4-423f-9d57-abb2003ac0a7/podcast.rss' }
 ];
 
+// id values are stable keys the client uses to say which sources are enabled (?sources=nyt,cnbc).
+// WSJ and Yahoo Finance are deliberately excluded: WSJ's feeds are dead (frozen since Jan 2025,
+// re-verified), Yahoo Finance has no working public feed at all (every endpoint tested 404/400).
 const FEEDS = [
-  { source: 'The New York Times', url: 'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml' },
-  { source: 'MarketWatch', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories' },
-  { source: 'CNBC', url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html' }
+  { id: 'nyt', source: 'The New York Times', url: 'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml' },
+  { id: 'marketwatch', source: 'MarketWatch', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories' },
+  { id: 'cnbc', source: 'CNBC', url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html' },
+  { id: 'bloomberg', source: 'Bloomberg', url: 'https://www.bloomberg.com/feeds/markets/news.rss' },
+  { id: 'ft', source: 'Financial Times', url: 'https://www.ft.com/world?format=rss' }
 ];
 
 const EXPLAIN_MODEL = '@cf/meta/llama-3.2-3b-instruct';
@@ -56,7 +61,7 @@ export default {
       if (url.pathname === '/spotify/token' && request.method === 'POST') return await handleSpotifyToken(request, env);
       if (url.pathname === '/spotify/shows') return await handleSpotifyShows(url, env);
       if (url.pathname === '/podcasts') return await handlePodcasts();
-      return await handleNews();
+      return await handleNews(url);
     } catch (err) {
       return json({ error: String(err) }, 500);
     }
@@ -79,8 +84,10 @@ function json(body, status, cacheSeconds) {
 
 // ---- /  (news) ----
 
-async function handleNews() {
-  const results = await Promise.all(FEEDS.map(fetchFeed));
+async function handleNews(url) {
+  const requested = (url.searchParams.get('sources') || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const feeds = requested.length ? FEEDS.filter((f) => requested.includes(f.id)) : FEEDS;
+  const results = await Promise.all(feeds.map(fetchFeed));
   const items = results.flat().sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)).slice(0, 24);
   return json({ items }, 200, 300);
 }

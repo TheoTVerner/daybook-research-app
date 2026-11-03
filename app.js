@@ -393,8 +393,61 @@ function renderFilteredStories(containerId, matchMap, label){
   matched.slice(0, 6).forEach(function(m){ container.appendChild(createStoryElement(m.item, m.sym)); });
 }
 
+var ALL_NEWS_SOURCES = ['nyt', 'marketwatch', 'cnbc', 'bloomberg', 'ft'];
+var NEWS_SOURCES_KEY = 'daybook_enabled_news_sources';
+
+function getEnabledNewsSources(){
+  try{
+    var stored = localStorage.getItem(NEWS_SOURCES_KEY);
+    if(stored) return JSON.parse(stored);
+  }catch(e){}
+  return ALL_NEWS_SOURCES.slice();
+}
+
+function setEnabledNewsSources(list){
+  try{ localStorage.setItem(NEWS_SOURCES_KEY, JSON.stringify(list)); }catch(e){}
+}
+
+function toggleNewsSource(btn){
+  var card = btn.closest('.connector-card');
+  var id = card.dataset.sourceId;
+  var enabled = getEnabledNewsSources();
+  var connected;
+  if(enabled.indexOf(id) !== -1){
+    enabled = enabled.filter(function(s){ return s !== id; });
+    connected = false;
+  } else {
+    enabled.push(id);
+    connected = true;
+  }
+  setEnabledNewsSources(enabled);
+  card.classList.toggle('connected', connected);
+  card.querySelector('.connector-status').textContent = connected ? 'Connected' : 'Not connected';
+  btn.textContent = connected ? 'Disconnect' : 'Connect';
+  loadNews();
+}
+
+function applyNewsSourceCardStates(){
+  var enabled = getEnabledNewsSources();
+  document.querySelectorAll('.connector-card[data-source-id]').forEach(function(card){
+    var connected = enabled.indexOf(card.dataset.sourceId) !== -1;
+    card.classList.toggle('connected', connected);
+    card.querySelector('.connector-status').textContent = connected ? 'Connected' : 'Not connected';
+    card.querySelector('.connector-toggle').textContent = connected ? 'Disconnect' : 'Connect';
+  });
+}
+
 function loadNews(){
-  fetch(NEWS_API)
+  var enabled = getEnabledNewsSources();
+  if(enabled.length === 0){
+    newsPool = [];
+    ['marketsStories', 'portfolioStories', 'watchlistStories'].forEach(function(id){
+      emptyState(document.getElementById(id), 'No news sources are connected. Turn one on in Manage → Connectors.');
+    });
+    return;
+  }
+  var url = NEWS_API + '?sources=' + encodeURIComponent(enabled.join(','));
+  fetch(url)
     .then(function(res){ return res.json(); })
     .then(function(data){
       newsPool = data.items || [];
@@ -408,6 +461,7 @@ function loadNews(){
       });
     });
 }
+applyNewsSourceCardStates();
 loadNews();
 loadQuotes();
 buildCalendar();

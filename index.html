@@ -147,17 +147,25 @@
 
       <p class="section-label">Connectors</p>
       <div class="connector-grid">
-        <div class="connector-card connected">
+        <div class="connector-card connected" data-source-id="nyt">
           <div class="connector-info"><p class="connector-name">The New York Times</p><p class="connector-type">News</p><span class="connector-status">Connected</span></div>
-          <button class="connector-toggle" onclick="toggleConnector(this)">Disconnect</button>
+          <button class="connector-toggle" onclick="toggleNewsSource(this)">Disconnect</button>
         </div>
-        <div class="connector-card connected">
+        <div class="connector-card connected" data-source-id="marketwatch">
           <div class="connector-info"><p class="connector-name">MarketWatch</p><p class="connector-type">News</p><span class="connector-status">Connected</span></div>
-          <button class="connector-toggle" onclick="toggleConnector(this)">Disconnect</button>
+          <button class="connector-toggle" onclick="toggleNewsSource(this)">Disconnect</button>
         </div>
-        <div class="connector-card connected">
+        <div class="connector-card connected" data-source-id="cnbc">
           <div class="connector-info"><p class="connector-name">CNBC</p><p class="connector-type">News</p><span class="connector-status">Connected</span></div>
-          <button class="connector-toggle" onclick="toggleConnector(this)">Disconnect</button>
+          <button class="connector-toggle" onclick="toggleNewsSource(this)">Disconnect</button>
+        </div>
+        <div class="connector-card connected" data-source-id="bloomberg">
+          <div class="connector-info"><p class="connector-name">Bloomberg</p><p class="connector-type">News</p><span class="connector-status">Connected</span></div>
+          <button class="connector-toggle" onclick="toggleNewsSource(this)">Disconnect</button>
+        </div>
+        <div class="connector-card connected" data-source-id="ft">
+          <div class="connector-info"><p class="connector-name">Financial Times</p><p class="connector-type">News</p><span class="connector-status">Connected</span></div>
+          <button class="connector-toggle" onclick="toggleNewsSource(this)">Disconnect</button>
         </div>
         <div class="connector-card connected">
           <div class="connector-info"><p class="connector-name">Finnhub</p><p class="connector-type">Market Data</p><span class="connector-status">Connected</span></div>
