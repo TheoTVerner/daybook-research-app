@@ -21,7 +21,7 @@ document.querySelectorAll('.tab').forEach(function(t){
 function updateDate(){
   try{
     document.getElementById('todayDate').textContent =
-      new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' }).toUpperCase();
+      new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' }).toUpperCase();
   }catch(e){}
 }
 updateDate();

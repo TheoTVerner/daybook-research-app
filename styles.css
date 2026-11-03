@@ -21,12 +21,13 @@ body{
   padding-right:env(safe-area-inset-right,0px);
 }
 
-.masthead{ flex:none; background:var(--app-navy); color:#fff;
-  padding:calc(10px + env(safe-area-inset-top,0px)) 18px 14px; display:flex; align-items:flex-end;
-  justify-content:space-between; border-bottom:3px solid var(--app-crimson); }
-.masthead-date{ font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--app-silver); margin:0 0 3px; }
-.masthead-title{ font-family:'Source Serif 4',Georgia,serif; font-weight:700; font-size:24px; margin:0; letter-spacing:.01em; }
-.masthead-icon{ width:32px; height:32px; border-radius:9px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2);
+.masthead{ position:relative; flex:none; background:var(--app-navy); color:#fff;
+  padding:calc(14px + env(safe-area-inset-top,0px)) 18px 16px; text-align:center;
+  border-bottom:3px solid var(--app-crimson); }
+.masthead-title{ font-family:'Source Serif 4',Georgia,serif; font-weight:700; font-size:34px; margin:0; letter-spacing:.01em; }
+.masthead-date{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--app-silver); margin:6px 0 0; }
+.masthead-icon{ position:absolute; top:calc(14px + env(safe-area-inset-top,0px)); right:18px;
+  width:32px; height:32px; border-radius:9px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2);
   color:var(--app-silver); display:flex; align-items:center; justify-content:center; flex:none; }
 .masthead-icon svg{ width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:2; }
 
@@ -132,9 +133,9 @@ body{
 .cal-title{ flex:1; min-width:0; }
 .cal-time{ flex:none; color:var(--app-ink-soft); font-size:11px; }
 
-.tabbar{ flex:none; display:flex; align-items:center;
-  padding:10px 0 calc(10px + env(safe-area-inset-bottom,0px)); background:var(--app-navy);
-  border-top:1px solid rgba(255,255,255,.08); }
+.tabbar{ flex:none; display:flex; align-items:stretch;
+  height:calc(60px + env(safe-area-inset-bottom,0px)); padding-bottom:env(safe-area-inset-bottom,0px);
+  background:var(--app-navy); border-top:1px solid rgba(255,255,255,.08); }
 .tab{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none;
   color:var(--app-silver); position:relative; }
 .tab-icon-wrap{ display:flex; align-items:center; justify-content:center; width:42px; height:32px; border-radius:12px; }
