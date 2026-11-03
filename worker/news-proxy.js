@@ -87,9 +87,26 @@ function json(body, status, cacheSeconds) {
 async function handleNews(url) {
   const requested = (url.searchParams.get('sources') || '').split(',').map((s) => s.trim()).filter(Boolean);
   const feeds = requested.length ? FEEDS.filter((f) => requested.includes(f.id)) : FEEDS;
-  const results = await Promise.all(feeds.map(fetchFeed));
-  const items = results.flat().sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)).slice(0, 24);
+  const perFeed = await Promise.all(feeds.map(fetchFeed));
+  // Don't trust each feed's own document order -- Bloomberg's, for one, is actually
+  // oldest-first, the opposite of the usual RSS convention. Sort explicitly per source.
+  const sortedPerFeed = perFeed.map((list) => list.slice().sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)));
+  const items = interleaveBySource(sortedPerFeed).slice(0, 24);
   return json({ items }, 200, 300);
+}
+
+// Round-robin by source (each source's Nth-most-recent item, sorted by recency within that
+// round) instead of a flat global sort -- a prolific source like Bloomberg would otherwise
+// crowd every other source out of the top N just by posting more often.
+function interleaveBySource(perFeedLists) {
+  const maxLen = perFeedLists.reduce((max, list) => Math.max(max, list.length), 0);
+  const result = [];
+  for (let i = 0; i < maxLen; i++) {
+    const round = perFeedLists.map((list) => list[i]).filter(Boolean);
+    round.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+    result.push(...round);
+  }
+  return result;
 }
 
 async function fetchFeed(feed) {
