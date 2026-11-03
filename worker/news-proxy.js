@@ -5,6 +5,7 @@
 //   GET /earnings?symbols=AAPL,MSFT  -> each symbol's next real earnings-call date via Finnhub
 //   POST /spotify/token  {code, redirect_uri}  -> exchanges an OAuth code for Spotify tokens
 //   GET /spotify/shows?refresh_token=...  -> the user's real followed shows + latest episode
+//   GET /podcasts  -> latest real episode for a fixed, curated list of shows (no login needed)
 //
 // Requires these set in the Cloudflare dashboard (Worker > Settings):
 //   - Secret "FINNHUB_API_KEY": a free key from finnhub.io
@@ -20,6 +21,16 @@ const ALLOWED_ORIGIN = 'https://theotverner.github.io';
 
 // Not secret (Spotify Client IDs are public by design) -- set once you've registered the app.
 const SPOTIFY_CLIENT_ID = 'REPLACE_WITH_YOUR_SPOTIFY_CLIENT_ID';
+
+// Curated, not auto-synced from anywhere -- verified live with curl before adding (same way
+// WSJ/Reuters/Yahoo Finance's dead news feeds were ruled out). Update this list directly to
+// change which shows appear when Spotify isn't connected.
+const PODCASTS = [
+  { name: 'In Good Company', url: 'https://feeds.acast.com/public/shows/in-good-company-with-nicolai-tangen' },
+  { name: 'Wall Street Breakfast', url: 'https://www.spreaker.com/show/5725002/episodes/feed' },
+  { name: 'Goldman Sachs Exchanges', url: 'https://feeds.megaphone.fm/GLD9218176758' },
+  { name: 'WSJ Tech News Briefing', url: 'https://feeds.simplecast.com/ui_HbBma' }
+];
 
 const FEEDS = [
   { source: 'The New York Times', url: 'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml' },
@@ -41,6 +52,7 @@ export default {
       if (url.pathname === '/earnings') return await handleEarnings(url, env);
       if (url.pathname === '/spotify/token' && request.method === 'POST') return await handleSpotifyToken(request, env);
       if (url.pathname === '/spotify/shows') return await handleSpotifyShows(url, env);
+      if (url.pathname === '/podcasts') return await handlePodcasts();
       return await handleNews();
     } catch (err) {
       return json({ error: String(err) }, 500);
@@ -332,4 +344,51 @@ async function handleSpotifyShows(url, env) {
   }));
 
   return json({ shows }, 200, 300);
+}
+
+// ---- /podcasts (curated show list, no login) ----
+
+async function handlePodcasts() {
+  const shows = await Promise.all(PODCASTS.map(fetchPodcastLatest));
+  return json({ shows }, 200, 1800);
+}
+
+async function fetchPodcastLatest(show) {
+  try {
+    const res = await fetch(show.url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DaybookPodcastProxy/1.0)' } });
+    if (!res.ok) return { name: show.name, episode: null };
+    const xml = await res.text();
+
+    const firstItemStart = xml.indexOf('<item>');
+    if (firstItemStart === -1) return { name: show.name, episode: null };
+    const channelBlock = xml.slice(0, firstItemStart);
+    const itemBlock = xml.slice(firstItemStart).split('</item>')[0];
+
+    const title = cleanText(extractTag(itemBlock, 'title'));
+    const pubDate = extractTag(itemBlock, 'pubDate');
+    const link = cleanText(extractTag(itemBlock, 'link'));
+    const image = extractItunesImageHref(itemBlock) || extractItunesImageHref(channelBlock) || extractChannelImageUrl(channelBlock);
+
+    return {
+      name: show.name,
+      episode: {
+        title: title || null,
+        publishedAt: pubDate ? new Date(pubDate).toISOString() : null,
+        link: link || null,
+        image: image || null
+      }
+    };
+  } catch (err) {
+    return { name: show.name, episode: null };
+  }
+}
+
+function extractItunesImageHref(block) {
+  const m = block.match(/<itunes:image[^>]*href=["']([^"']+)["']/i);
+  return m ? m[1] : null;
+}
+
+function extractChannelImageUrl(block) {
+  const m = block.match(/<image>[\s\S]*?<url>([\s\S]*?)<\/url>[\s\S]*?<\/image>/i);
+  return m ? m[1].trim() : null;
 }

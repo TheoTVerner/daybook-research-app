@@ -416,12 +416,15 @@ buildCalendar();
 
 function setSpotifyConnectorUI(connected){
   var card = document.getElementById('spotifyConnectorCard');
-  if(!card) return;
-  card.classList.toggle('connected', connected);
-  var status = card.querySelector('.connector-status');
-  if(status) status.textContent = connected ? 'Connected' : 'Not connected';
-  var btn = card.querySelector('.connector-toggle');
-  if(btn) btn.textContent = connected ? 'Disconnect' : 'Connect';
+  if(card){
+    card.classList.toggle('connected', connected);
+    var status = card.querySelector('.connector-status');
+    if(status) status.textContent = connected ? 'Connected' : 'Not connected';
+    var btn = card.querySelector('.connector-toggle');
+    if(btn) btn.textContent = connected ? 'Disconnect' : 'Connect';
+  }
+  var label = document.getElementById('podcastSectionLabel');
+  if(label) label.textContent = connected ? 'From Your Spotify' : 'Podcasts';
 }
 
 function connectSpotify(){
@@ -440,6 +443,7 @@ function connectSpotify(){
 function disconnectSpotify(){
   try{ localStorage.removeItem(SPOTIFY_TOKEN_KEY); }catch(e){}
   setSpotifyConnectorUI(false);
+  loadPodcastFeeds();
 }
 
 function handleSpotifyConnectorClick(btn){
@@ -483,6 +487,63 @@ function createSpotifyShowCard(show){
   card.appendChild(title);
   card.appendChild(sub);
   return card;
+}
+
+// Curated real podcast feeds (no Spotify login needed) -- the default when Spotify isn't connected.
+function createPodcastCard(show, variantIndex){
+  var card = document.createElement('div');
+  card.className = 'podcast-card';
+
+  var art = document.createElement('div');
+  art.className = 'pod-art v' + ((variantIndex % 4) + 1);
+  var ep = show.episode;
+  if(ep && ep.image){
+    var img = document.createElement('img');
+    img.className = 'pod-art-img';
+    img.src = ep.image;
+    img.alt = show.name;
+    art.appendChild(img);
+  } else {
+    var mono = document.createElement('span');
+    mono.className = 'pod-mono';
+    mono.textContent = show.name.split(' ').map(function(w){ return w[0] || ''; }).join('').slice(0, 3).toUpperCase();
+    art.appendChild(mono);
+  }
+  var link = (ep && ep.link) || 'https://open.spotify.com/search/' + encodeURIComponent(show.name);
+  var play = document.createElement('a');
+  play.className = 'play-btn';
+  play.href = link; play.target = '_blank'; play.rel = 'noopener';
+  play.textContent = '▶';
+  play.setAttribute('aria-label', 'Listen to ' + show.name);
+  art.appendChild(play);
+  card.appendChild(art);
+
+  var title = document.createElement('p');
+  title.className = 'pod-title';
+  title.textContent = (ep && ep.title) || 'Latest episode unavailable';
+  var sub = document.createElement('p');
+  sub.className = 'pod-show';
+  sub.textContent = show.name;
+  card.appendChild(title);
+  card.appendChild(sub);
+  return card;
+}
+
+function loadPodcastFeeds(){
+  var hasSpotify = false;
+  try{ hasSpotify = !!localStorage.getItem(SPOTIFY_TOKEN_KEY); }catch(e){}
+  if(hasSpotify) return; // real connected Spotify data takes priority when present
+
+  var row = document.getElementById('podcastRow');
+  fetch(NEWS_API + 'podcasts')
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      var shows = data.shows || [];
+      if(!shows.length){ emptyState(row, "Couldn't load podcasts right now."); return; }
+      row.innerHTML = '';
+      shows.forEach(function(show, i){ row.appendChild(createPodcastCard(show, i)); });
+    })
+    .catch(function(){ emptyState(row, "Couldn't load podcasts right now."); });
 }
 
 function loadSpotifyShows(){
@@ -535,6 +596,8 @@ handleSpotifyCallback();
   if(hasToken){
     setSpotifyConnectorUI(true);
     loadSpotifyShows();
+  } else {
+    loadPodcastFeeds();
   }
 })();
 
