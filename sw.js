@@ -1,4 +1,4 @@
-const CACHE = 'daybook-v3';
+const CACHE = 'daybook-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -42,6 +42,33 @@ self.addEventListener('fetch', function(e){
       return res;
     }).catch(function(){
       return caches.match(e.request);
+    })
+  );
+});
+
+// ---- Push notifications (earnings reminders) ----
+self.addEventListener('push', function(e){
+  var data = {};
+  try{ data = e.data ? e.data.json() : {}; }catch(err){}
+  var title = data.title || 'Daybook';
+  var options = {
+    body: data.body || '',
+    icon: './icons/icon-192.png',
+    badge: './icons/icon-192.png',
+    data: { url: data.url || './' }
+  };
+  e.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', function(e){
+  e.notification.close();
+  var url = (e.notification.data && e.notification.data.url) || './';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientsArr){
+      for(var i = 0; i < clientsArr.length; i++){
+        if('focus' in clientsArr[i]) return clientsArr[i].focus();
+      }
+      if(self.clients.openWindow) return self.clients.openWindow(url);
     })
   );
 });

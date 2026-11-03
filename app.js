@@ -203,6 +203,7 @@ function removeEditPosition(){
   if(currentEditLi) currentEditLi.remove();
   closeEditOverlay();
   buildCalendar();
+  syncPushSymbols();
 }
 
 function toggleConnector(btn){
@@ -259,12 +260,14 @@ addForm.addEventListener('submit', function(e){
       renderFilteredStories('watchlistStories', WATCHLIST_MATCH, 'watchlist');
     }
     buildCalendar();
+    syncPushSymbols();
   });
 });
 
 function removeWatchlistRow(btn){
   btn.closest('li').remove();
   buildCalendar();
+  syncPushSymbols();
 }
 
 // ---- Real news, fetched from the Cloudflare Worker RSS proxy ----
@@ -655,8 +658,116 @@ handleSpotifyCallback();
   }
 })();
 
+// ---- Push notifications (earnings reminders) ----
+var PUSH_VAPID_PUBLIC_KEY = 'BIm-iTQBPacSFStOaDaOL-Vgp64I-_0dlw4rJVGG_OiRTi1nk5f8CBYNdZ1Dw7MhtDi_IMUpSt5HBGSE_7JNAz8';
+
+function urlBase64ToUint8Array(base64String){
+  var padding = '='.repeat((4 - base64String.length % 4) % 4);
+  var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  var rawData = atob(base64);
+  var outputArray = new Uint8Array(rawData.length);
+  for(var i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+function setPushConnectorUI(connected){
+  var card = document.getElementById('pushConnectorCard');
+  if(!card) return;
+  card.classList.toggle('connected', connected);
+  card.querySelector('.connector-status').textContent = connected ? 'Connected' : 'Not connected';
+  card.querySelector('.connector-toggle').textContent = connected ? 'Disconnect' : 'Connect';
+}
+
+function enablePushNotifications(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    var card = document.getElementById('pushConnectorCard');
+    if(card) card.querySelector('.connector-status').textContent = 'Not supported on this device';
+    return;
+  }
+  Notification.requestPermission().then(function(permission){
+    if(permission !== 'granted'){
+      var card = document.getElementById('pushConnectorCard');
+      if(card) card.querySelector('.connector-status').textContent = 'Permission denied';
+      return;
+    }
+    navigator.serviceWorker.ready.then(function(reg){
+      return reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(PUSH_VAPID_PUBLIC_KEY)
+      });
+    }).then(function(sub){
+      return fetch(NEWS_API + 'push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: sub.toJSON(), symbols: collectHeldSymbols() })
+      });
+    }).then(function(){
+      setPushConnectorUI(true);
+    }).catch(function(){
+      var card = document.getElementById('pushConnectorCard');
+      if(card) card.querySelector('.connector-status').textContent = "Couldn't enable";
+    });
+  });
+}
+
+function disablePushNotifications(){
+  navigator.serviceWorker.ready.then(function(reg){
+    return reg.pushManager.getSubscription();
+  }).then(function(sub){
+    if(!sub){ setPushConnectorUI(false); return; }
+    var endpoint = sub.endpoint;
+    return sub.unsubscribe().then(function(){
+      return fetch(NEWS_API + 'push/unsubscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint: endpoint })
+      });
+    }).then(function(){ setPushConnectorUI(false); });
+  }).catch(function(){ setPushConnectorUI(false); });
+}
+
+function togglePushNotifications(btn){
+  var connected = btn.closest('.connector-card').classList.contains('connected');
+  if(connected) disablePushNotifications(); else enablePushNotifications();
+}
+
+// Keeps the server's stored symbol list current -- call after any portfolio/watchlist change.
+function syncPushSymbols(){
+  if(!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.ready.then(function(reg){
+    return reg.pushManager.getSubscription();
+  }).then(function(sub){
+    if(!sub) return;
+    fetch(NEWS_API + 'push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription: sub.toJSON(), symbols: collectHeldSymbols() })
+    }).catch(function(){});
+  }).catch(function(){});
+}
+
+function sendTestPush(){
+  var btn = document.getElementById('pushTestBtn');
+  var original = btn.textContent;
+  btn.textContent = 'Sending…';
+  fetch(NEWS_API + 'push/test', { method: 'POST' })
+    .then(function(res){ return res.json().then(function(data){ return { ok: res.ok, data: data }; }); })
+    .then(function(result){
+      btn.textContent = result.ok ? 'Sent!' : 'Failed — see Manage';
+      setTimeout(function(){ btn.textContent = original; }, 2500);
+    })
+    .catch(function(){
+      btn.textContent = 'Failed';
+      setTimeout(function(){ btn.textContent = original; }, 2500);
+    });
+}
+
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
-    navigator.serviceWorker.register('sw.js').catch(function(){});
+    navigator.serviceWorker.register('sw.js').then(function(reg){
+      return reg.pushManager.getSubscription();
+    }).then(function(sub){
+      setPushConnectorUI(!!sub);
+    }).catch(function(){});
   });
 }

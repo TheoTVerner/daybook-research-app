@@ -180,6 +180,17 @@
           <button class="connector-toggle" onclick="handleSpotifyConnectorClick(this)">Connect</button>
         </div>
       </div>
+
+      <p class="section-label">Notifications</p>
+      <div class="connector-grid">
+        <div class="connector-card" id="pushConnectorCard">
+          <div class="connector-info"><p class="connector-name">Earnings Reminders</p><p class="connector-type">Push</p><span class="connector-status">Not connected</span></div>
+          <button class="connector-toggle" onclick="togglePushNotifications(this)">Connect</button>
+        </div>
+      </div>
+      <div class="push-test-row">
+        <button type="button" class="btn btn-outline" id="pushTestBtn" onclick="sendTestPush()">Send Test Notification</button>
+      </div>
     </section>
 
     <!-- CALENDAR -->

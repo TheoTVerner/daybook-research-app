@@ -6,11 +6,20 @@
 //   POST /spotify/token  {code, redirect_uri}  -> exchanges an OAuth code for Spotify tokens
 //   GET /spotify/shows?refresh_token=...  -> the user's real followed shows + latest episode
 //   GET /podcasts  -> latest real episode for a fixed, curated list of shows (no login needed)
+//   POST /push/subscribe  {subscription, symbols}  -> save/update this device's push subscription
+//   POST /push/unsubscribe  {endpoint}  -> remove a stored subscription
+//   POST /push/test  -> immediately sends one test push to the stored subscription
+//   scheduled() (Cron Trigger)  -> once a day, checks each subscribed symbol's next earnings
+//     date and pushes a reminder if it's today or tomorrow
 //
 // Requires these set in the Cloudflare dashboard (Worker > Settings):
 //   - Secret "FINNHUB_API_KEY": a free key from finnhub.io
 //   - Binding "AI": the built-in Workers AI binding (free tier, no extra signup)
 //   - Secret "SPOTIFY_CLIENT_SECRET": from the app registered at developer.spotify.com/dashboard
+//   - Secret "VAPID_PRIVATE_KEY": generated alongside VAPID_PUBLIC_KEY below, for Web Push
+//   - KV namespace binding "PUSH_SUBS": Settings > Bindings > Add > KV Namespace
+//   - A Cron Trigger (Settings > Triggers > Cron Triggers), e.g. "0 13 * * *" (~8am ET) for the
+//     scheduled() handler to actually run on its own
 //
 // Reuters shut down its public RSS feeds a few years back and Yahoo Finance never
 // offered an official API, so neither is included. Dow Jones' WSJ feeds
@@ -21,6 +30,10 @@ const ALLOWED_ORIGIN = 'https://theotverner.github.io';
 
 // Not secret (Spotify Client IDs are public by design) -- set once you've registered the app.
 const SPOTIFY_CLIENT_ID = 'REPLACE_WITH_YOUR_SPOTIFY_CLIENT_ID';
+
+// Not secret -- the matching VAPID_PRIVATE_KEY is a Cloudflare secret, never in this file.
+const VAPID_PUBLIC_KEY = 'BIm-iTQBPacSFStOaDaOL-Vgp64I-_0dlw4rJVGG_OiRTi1nk5f8CBYNdZ1Dw7MhtDi_IMUpSt5HBGSE_7JNAz8';
+const VAPID_SUBJECT = 'https://theotverner.github.io/daybook-research-app/';
 
 // Curated, not auto-synced from anywhere -- verified live before adding (same way
 // WSJ/Reuters/Yahoo Finance's dead news feeds were ruled out). appleId is each show's Apple
@@ -64,10 +77,18 @@ export default {
       if (url.pathname === '/spotify/token' && request.method === 'POST') return await handleSpotifyToken(request, env);
       if (url.pathname === '/spotify/shows') return await handleSpotifyShows(url, env);
       if (url.pathname === '/podcasts') return await handlePodcasts();
+      if (url.pathname === '/push/subscribe' && request.method === 'POST') return await handlePushSubscribe(request, env);
+      if (url.pathname === '/push/unsubscribe' && request.method === 'POST') return await handlePushUnsubscribe(request, env);
+      if (url.pathname === '/push/test' && request.method === 'POST') return await handlePushTest(env);
       return await handleNews(url);
     } catch (err) {
       return json({ error: String(err) }, 500);
     }
+  },
+
+  // Cron Trigger entry point -- runs on its own schedule, independent of any request.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(checkEarningsAndNotify(env));
   }
 };
 
@@ -402,5 +423,223 @@ async function fetchPodcastLatest(show) {
     };
   } catch (err) {
     return { name: show.name, episode: null };
+  }
+}
+
+// ---- /push/* (Web Push subscription management + earnings-reminder logic) ----
+
+const PUSH_SUB_KEY = 'push_subscription';
+
+async function handlePushSubscribe(request, env) {
+  if (!env.PUSH_SUBS) return json({ error: 'PUSH_SUBS KV binding not configured' }, 500);
+  let body;
+  try {
+    body = await request.json();
+  } catch (err) {
+    return json({ error: 'invalid request body' }, 400);
+  }
+  const subscription = body && body.subscription;
+  const symbols = (body && Array.isArray(body.symbols)) ? body.symbols : [];
+  if (!subscription || !subscription.endpoint) return json({ error: 'subscription is required' }, 400);
+
+  const existingRaw = await env.PUSH_SUBS.get(PUSH_SUB_KEY);
+  const existing = existingRaw ? JSON.parse(existingRaw) : {};
+  const record = { subscription, symbols, notified: existing.notified || {} };
+  await env.PUSH_SUBS.put(PUSH_SUB_KEY, JSON.stringify(record));
+  return json({ ok: true }, 200);
+}
+
+async function handlePushUnsubscribe(request, env) {
+  if (!env.PUSH_SUBS) return json({ error: 'PUSH_SUBS KV binding not configured' }, 500);
+  await env.PUSH_SUBS.delete(PUSH_SUB_KEY);
+  return json({ ok: true }, 200);
+}
+
+async function handlePushTest(env) {
+  if (!env.PUSH_SUBS) return json({ error: 'PUSH_SUBS KV binding not configured' }, 500);
+  const raw = await env.PUSH_SUBS.get(PUSH_SUB_KEY);
+  if (!raw) return json({ error: 'no stored subscription -- enable notifications in the app first' }, 404);
+  const record = JSON.parse(raw);
+  try {
+    await sendWebPush(record.subscription, {
+      title: 'Daybook test notification',
+      body: 'If you can see this, push notifications are working.',
+      url: VAPID_SUBJECT
+    }, env);
+    return json({ ok: true }, 200);
+  } catch (err) {
+    return json({ error: String(err && err.message ? err.message : err) }, 500);
+  }
+}
+
+// Cron-triggered: checks every subscribed symbol's next earnings date and sends a push for
+// anything landing today or tomorrow, deduped per symbol+date so it only fires once each.
+async function checkEarningsAndNotify(env) {
+  if (!env.PUSH_SUBS || !env.FINNHUB_API_KEY) return;
+  const raw = await env.PUSH_SUBS.get(PUSH_SUB_KEY);
+  if (!raw) return;
+  const record = JSON.parse(raw);
+  const symbols = record.symbols || [];
+  if (!symbols.length) return;
+
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const tomorrowStr = new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const notified = record.notified || {};
+  let changed = false;
+
+  for (const sym of symbols) {
+    try {
+      const res = await fetch(`https://finnhub.io/api/v1/calendar/earnings?from=${todayStr}&to=${tomorrowStr}&symbol=${encodeURIComponent(sym)}&token=${env.FINNHUB_API_KEY}`);
+      if (!res.ok) continue;
+      const data = await res.json();
+      const list = (data && data.earningsCalendar) || [];
+      for (const e of list) {
+        if (e.date !== todayStr && e.date !== tomorrowStr) continue;
+        const dedupeKey = sym + '|' + e.date;
+        if (notified[dedupeKey]) continue;
+
+        const when = e.date === todayStr ? 'Today' : 'Tomorrow';
+        const hourLabel = e.hour === 'bmo' ? ' (before market open)' : e.hour === 'amc' ? ' (after market close)' : '';
+        await sendWebPush(record.subscription, {
+          title: 'Earnings ' + when + ': ' + sym,
+          body: sym + ' reports earnings ' + when.toLowerCase() + hourLabel + '.',
+          url: VAPID_SUBJECT + '#calendar'
+        }, env);
+
+        notified[dedupeKey] = true;
+        changed = true;
+      }
+    } catch (err) {
+      // skip this symbol, keep checking the rest
+    }
+  }
+
+  if (changed) {
+    record.notified = notified;
+    await env.PUSH_SUBS.put(PUSH_SUB_KEY, JSON.stringify(record));
+  }
+}
+
+// ---- Web Push (RFC 8291 payload encryption + RFC 8292 VAPID auth), hand-rolled with the
+// Workers runtime's built-in Web Crypto API since there's no Node/npm here to use the
+// standard `web-push` library. HKDF is implemented directly over HMAC (not WebCrypto's
+// combined 'HKDF' algorithm) so each extract/expand step matches the RFC exactly. ----
+
+function base64urlToBytes(b64url) {
+  const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = b64 + '==='.slice((b64.length + 3) % 4);
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function bytesToBase64url(bytes) {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function concatBytes(...arrays) {
+  let total = 0;
+  for (const a of arrays) total += a.length;
+  const result = new Uint8Array(total);
+  let offset = 0;
+  for (const a of arrays) { result.set(a, offset); offset += a.length; }
+  return result;
+}
+
+async function hmacSha256(keyBytes, dataBytes) {
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return new Uint8Array(await crypto.subtle.sign('HMAC', key, dataBytes));
+}
+
+async function hkdfExtract(salt, ikm) {
+  return hmacSha256(salt, ikm);
+}
+
+async function hkdfExpand(prk, info, length) {
+  // Every length needed here is <= 32 bytes (SHA-256's output size), so a single HMAC round
+  // (RFC 5869's T(1)) is always sufficient -- no need for the general multi-round case.
+  const t1 = await hmacSha256(prk, concatBytes(info, new Uint8Array([1])));
+  return t1.slice(0, length);
+}
+
+async function encryptPushPayload(payloadObj, p256dhB64, authB64) {
+  const payloadBytes = new TextEncoder().encode(JSON.stringify(payloadObj));
+  const uaPublicBytes = base64urlToBytes(p256dhB64);
+  const authSecret = base64urlToBytes(authB64);
+
+  const asKeyPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const asPublicBytes = new Uint8Array(await crypto.subtle.exportKey('raw', asKeyPair.publicKey));
+
+  const uaPublicKey = await crypto.subtle.importKey('raw', uaPublicBytes, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const ecdhSecret = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: uaPublicKey }, asKeyPair.privateKey, 256));
+
+  const prkKey = await hkdfExtract(authSecret, ecdhSecret);
+  const keyInfo = concatBytes(new TextEncoder().encode('WebPush: info\0'), uaPublicBytes, asPublicBytes);
+  const ikm = await hkdfExpand(prkKey, keyInfo, 32);
+
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const prk = await hkdfExtract(salt, ikm);
+  const cek = await hkdfExpand(prk, new TextEncoder().encode('Content-Encoding: aes128gcm\0'), 16);
+  const nonce = await hkdfExpand(prk, new TextEncoder().encode('Content-Encoding: nonce\0'), 12);
+
+  const padded = concatBytes(payloadBytes, new Uint8Array([2])); // 0x02 = final/only record
+  const cekKey = await crypto.subtle.importKey('raw', cek, { name: 'AES-GCM' }, false, ['encrypt']);
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, cekKey, padded));
+
+  const header = new Uint8Array(16 + 4 + 1 + asPublicBytes.length);
+  header.set(salt, 0);
+  new DataView(header.buffer).setUint32(16, 4096, false);
+  header[20] = asPublicBytes.length;
+  header.set(asPublicBytes, 21);
+
+  return concatBytes(header, ciphertext);
+}
+
+async function buildVapidAuthHeader(endpoint, env) {
+  const aud = new URL(endpoint).origin;
+  const now = Math.floor(Date.now() / 1000);
+  const jwtHeader = { typ: 'JWT', alg: 'ES256' };
+  const jwtPayload = { aud, exp: now + 12 * 3600, sub: VAPID_SUBJECT };
+  const signingInput = bytesToBase64url(new TextEncoder().encode(JSON.stringify(jwtHeader))) + '.' +
+    bytesToBase64url(new TextEncoder().encode(JSON.stringify(jwtPayload)));
+
+  const privBytes = base64urlToBytes(env.VAPID_PRIVATE_KEY);
+  const pubBytes = base64urlToBytes(VAPID_PUBLIC_KEY);
+  const jwk = {
+    kty: 'EC', crv: 'P-256', ext: true,
+    x: bytesToBase64url(pubBytes.slice(1, 33)),
+    y: bytesToBase64url(pubBytes.slice(33, 65)),
+    d: bytesToBase64url(privBytes)
+  };
+  const signKey = await crypto.subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  const signature = new Uint8Array(await crypto.subtle.sign(
+    { name: 'ECDSA', hash: 'SHA-256' }, signKey, new TextEncoder().encode(signingInput)
+  ));
+  const jwt = signingInput + '.' + bytesToBase64url(signature);
+  return 'vapid t=' + jwt + ', k=' + VAPID_PUBLIC_KEY;
+}
+
+async function sendWebPush(subscription, payloadObj, env) {
+  if (!env.VAPID_PRIVATE_KEY) throw new Error('VAPID_PRIVATE_KEY not configured');
+  const body = await encryptPushPayload(payloadObj, subscription.keys.p256dh, subscription.keys.auth);
+  const authHeader = await buildVapidAuthHeader(subscription.endpoint, env);
+
+  const res = await fetch(subscription.endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'Content-Encoding': 'aes128gcm',
+      'TTL': '86400',
+      'Authorization': authHeader
+    },
+    body
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error('push service returned ' + res.status + ': ' + text);
   }
 }
