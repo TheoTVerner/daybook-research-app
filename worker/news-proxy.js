@@ -29,7 +29,10 @@ const PODCASTS = [
   { name: 'In Good Company', url: 'https://feeds.acast.com/public/shows/in-good-company-with-nicolai-tangen' },
   { name: 'Wall Street Breakfast', url: 'https://www.spreaker.com/show/5725002/episodes/feed' },
   { name: 'Goldman Sachs Exchanges', url: 'https://feeds.megaphone.fm/GLD9218176758' },
-  { name: 'WSJ Tech News Briefing', url: 'https://feeds.simplecast.com/ui_HbBma' }
+  { name: 'WSJ Tech News Briefing', url: 'https://feeds.simplecast.com/ui_HbBma' },
+  { name: 'Odd Lots', url: 'https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/8a94442e-5a74-4fa2-8b8d-ae27003a8d6b/982f5071-765c-403d-969d-ae27003a8d83/podcast.rss' },
+  { name: 'Planet Money', url: 'https://feeds.npr.org/510289/podcast.xml' },
+  { name: 'Motley Fool Money', url: 'https://www.omnycontent.com/d/playlist/820f09cf-2ace-4180-a92d-aa4c0008f5fb/c1c22a03-f4e2-49e4-9eff-abb2003ac099/25111702-47b4-423f-9d57-abb2003ac0a7/podcast.rss' }
 ];
 
 const FEEDS = [
