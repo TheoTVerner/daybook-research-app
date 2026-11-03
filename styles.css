@@ -180,6 +180,8 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 .edit-field span{ font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:rgba(231,233,238,.55); font-weight:700; }
 .edit-field input, .edit-field select{ background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.22); border-radius:8px;
   color:#fff; font-size:16px; padding:11px 12px; font-variant-numeric:tabular-nums; font-family:'Inter',sans-serif; }
+.edit-value-readout{ margin:0; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.14); border-radius:8px;
+  color:rgba(255,255,255,.85); font-size:16px; padding:11px 12px; font-variant-numeric:tabular-nums; font-family:'Inter',sans-serif; }
 .edit-remove{ flex:none; margin:8px 18px 24px; padding:13px 0; border-radius:8px; border:1px solid var(--app-down);
   background:none; color:#ff6f6f; font-weight:700; font-size:13px; }
 

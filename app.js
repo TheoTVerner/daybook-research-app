@@ -150,6 +150,28 @@ function openStockDetailBySymbol(sym){
   if(li) openEditOverlayForLi(li);
 }
 
+// Position value is always computed as shares x live price -- never manually entered -- so it
+// can't go stale the way a typed-in "amount invested" figure would the moment the price moves.
+function computePositionValue(li, shares){
+  var priceNum = parseFloat((li.querySelector('.price').textContent || '').replace(/[^0-9.]/g, ''));
+  if(isNaN(priceNum)) return null;
+  return shares * priceNum;
+}
+
+function formatPositionValue(value){
+  if(value === null) return '—';
+  return '$' + value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+var editSharesInputEl = document.getElementById('editSharesInput');
+if(editSharesInputEl){
+  editSharesInputEl.addEventListener('input', function(){
+    if(!currentEditLi) return;
+    var shares = parseFloat(editSharesInputEl.value) || 0;
+    document.getElementById('editValueReadout').textContent = formatPositionValue(computePositionValue(currentEditLi, shares));
+  });
+}
+
 function openEditOverlayForLi(li){
   currentEditLi = li;
   var isWatchlist = !!li.closest('#watchlistList');
@@ -169,8 +191,9 @@ function openEditOverlayForLi(li){
   document.getElementById('editRemoveBtn').textContent = isWatchlist ? 'Remove from Watchlist' : 'Remove from Portfolio';
 
   if(!isWatchlist){
-    document.getElementById('editSharesInput').value = parseFloat(li.querySelector('.qty-display').textContent) || 0;
-    document.getElementById('editInvestedInput').value = parseFloat(li.querySelector('.val-display').textContent.replace(/[^0-9.]/g, '')) || 0;
+    var currentShares = parseFloat(li.querySelector('.qty-display').textContent) || 0;
+    document.getElementById('editSharesInput').value = currentShares;
+    document.getElementById('editValueReadout').textContent = formatPositionValue(computePositionValue(li, currentShares));
     document.getElementById('editTypeInput').value = li.dataset.type || 'stock';
   }
 
@@ -360,11 +383,10 @@ function saveResearchNotes(){
 function saveEditOverlay(){
   if(!currentEditLi) return;
   var shares = parseFloat(document.getElementById('editSharesInput').value) || 0;
-  var invested = parseFloat(document.getElementById('editInvestedInput').value) || 0;
   var newType = document.getElementById('editTypeInput').value;
 
   currentEditLi.querySelector('.qty-display').textContent = shares + ' sh';
-  currentEditLi.querySelector('.val-display').textContent = '$' + invested.toLocaleString();
+  currentEditLi.querySelector('.val-display').textContent = formatPositionValue(computePositionValue(currentEditLi, shares));
 
   if(newType !== currentEditLi.dataset.type){
     currentEditLi.dataset.type = newType;
@@ -495,7 +517,7 @@ function serializePortfolio(){
       type: li.dataset.type,
       matchKeyword: NAME_HINTS[li.dataset.sym] || '',
       shares: parseFloat(li.querySelector('.qty-display').textContent) || 0,
-      invested: parseFloat(li.querySelector('.val-display').textContent.replace(/[^0-9.]/g, '')) || 0,
+      value: parseFloat(li.querySelector('.val-display').textContent.replace(/[^0-9.]/g, '')) || 0,
       price: li.querySelector('.price').textContent,
       chg: chgEl.textContent,
       chgClass: chgEl.classList.contains('up') ? 'up' : 'down'
@@ -540,7 +562,7 @@ function hydratePortfolioFromStorage(){
   items.forEach(function(it){
     var li = buildPortfolioLi(it.sym, it.name, it.type, it.price, it.chg, it.chgClass);
     li.querySelector('.qty-display').textContent = it.shares + ' sh';
-    li.querySelector('.val-display').textContent = '$' + Number(it.invested).toLocaleString();
+    li.querySelector('.val-display').textContent = formatPositionValue(it.value);
     document.getElementById(GROUP_LIST_IDS[it.type] || 'portfolioStocks').appendChild(li);
     if(it.matchKeyword){ PORTFOLIO_MATCH[it.sym] = it.matchKeyword; NAME_HINTS[it.sym] = it.matchKeyword; }
   });
@@ -628,6 +650,14 @@ function applyQuoteToLi(li, quote){
   if(quote.name){
     if(nameEl) nameEl.textContent = quote.name;
     li.dataset.name = quote.name;
+  }
+  // Portfolio rows only (watchlist rows have no qty-display/val-display) -- keeps the
+  // displayed position value exactly in sync with the live price, every refresh.
+  var qtyEl = li.querySelector('.qty-display');
+  var valEl = li.querySelector('.val-display');
+  if(qtyEl && valEl){
+    var shares = parseFloat(qtyEl.textContent) || 0;
+    valEl.textContent = formatPositionValue(computePositionValue(li, shares));
   }
 }
 
