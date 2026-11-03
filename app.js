@@ -1,3 +1,12 @@
+var NEWS_API = 'https://daybook-research.ttverner.workers.dev/';
+
+function collectHeldSymbols(){
+  var rows = document.querySelectorAll('#portfolioStocks [data-sym], #portfolioETFs [data-sym], #portfolioFunds [data-sym], #watchlistList [data-sym]');
+  var syms = [];
+  rows.forEach(function(li){ if(syms.indexOf(li.dataset.sym) === -1) syms.push(li.dataset.sym); });
+  return syms;
+}
+
 function switchTab(name){
   document.querySelectorAll('.panel').forEach(function(p){ p.hidden = p.id !== 'panel-' + name; });
   document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab === name); });
@@ -14,28 +23,18 @@ function updateDate(){
 }
 updateDate();
 
-function buildCalendar(){
-  var events = [
-    {day:6, sym:'AMZN', title:'Q3 Earnings Call', time:'4:30 PM ET'},
-    {day:12, sym:'TSLA', title:'Investor Day', time:''},
-    {day:13, sym:'COIN', title:'Q3 Earnings Call', time:'5:00 PM ET'},
-    {day:18, sym:'JPM', title:'Investor Conference', time:''},
-    {day:19, sym:'NVDA', title:'Q3 Earnings Call', time:'4:30 PM ET'},
-    {day:21, sym:'PLTR', title:'Investor Update', time:''},
-    {day:24, sym:'AAPL', title:'Q4 Earnings Call', time:'5:00 PM ET'},
-    {day:25, sym:'MSFT', title:'Q2 Earnings Call', time:'5:00 PM ET'},
-    {day:28, sym:'SOFI', title:'Investor Day', time:''}
-  ];
-  var monthNames = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
-  var now = new Date();
-  var year = now.getFullYear(), month = now.getMonth(), todayDate = now.getDate();
-  document.getElementById('calMonthLabel').textContent = monthNames[month] + ' ' + year;
+var CAL_MONTH_NAMES = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
 
+function earningsHourLabel(hour){
+  if(hour === 'bmo') return 'Before Open';
+  if(hour === 'amc') return 'After Close';
+  if(hour === 'dmh') return 'During Market';
+  return '';
+}
+
+function renderCalGrid(year, month, todayDate, eventDaysThisMonth){
   var firstDay = new Date(year, month, 1).getDay();
   var daysInMonth = new Date(year, month + 1, 0).getDate();
-  var eventDays = {};
-  events.forEach(function(e){ eventDays[e.day] = true; });
-
   var grid = document.getElementById('calGrid');
   grid.innerHTML = '';
   for(var i = 0; i < firstDay; i++){
@@ -46,21 +45,69 @@ function buildCalendar(){
   for(var d = 1; d <= daysInMonth; d++){
     var cell = document.createElement('div');
     cell.className = 'cal-day' + (d === todayDate ? ' today' : '');
-    cell.innerHTML = d + (eventDays[d] ? '<span class="cal-dot"></span>' : '');
+    cell.innerHTML = d + ((eventDaysThisMonth && eventDaysThisMonth[d]) ? '<span class="cal-dot"></span>' : '');
     grid.appendChild(cell);
   }
+}
+
+function buildCalendar(){
+  var now = new Date();
+  var year = now.getFullYear(), month = now.getMonth(), todayDate = now.getDate();
+  document.getElementById('calMonthLabel').textContent = CAL_MONTH_NAMES[month] + ' ' + year;
 
   var list = document.getElementById('calEventsList');
-  list.innerHTML = '';
-  events.sort(function(a, b){ return a.day - b.day; }).forEach(function(e){
-    var li = document.createElement('li');
-    li.innerHTML = '<span class="cal-date">' + monthNames[month].slice(0, 3) + ' ' + e.day + '</span>' +
-      '<span class="cal-pill">' + e.sym + '</span><span class="cal-title">' + e.title + '</span>' +
-      '<span class="cal-time">' + (e.time || '') + '</span>';
-    list.appendChild(li);
-  });
+  var syms = collectHeldSymbols();
+
+  if(!syms.length){
+    renderCalGrid(year, month, todayDate, null);
+    emptyState(list, 'Add stocks to your portfolio or watchlist to see upcoming earnings dates.');
+    return;
+  }
+
+  fetch(NEWS_API + 'earnings?symbols=' + encodeURIComponent(syms.join(',')))
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      var earningsBySym = data.earnings || {};
+      var events = [];
+      syms.forEach(function(sym){
+        var e = earningsBySym[sym];
+        if(!e || !e.date) return;
+        var parts = e.date.split('-');
+        events.push({
+          sym: sym,
+          year: parseInt(parts[0], 10),
+          month: parseInt(parts[1], 10) - 1,
+          day: parseInt(parts[2], 10),
+          time: earningsHourLabel(e.hour)
+        });
+      });
+      events.sort(function(a, b){
+        return (a.year - b.year) || (a.month - b.month) || (a.day - b.day);
+      });
+
+      var eventDaysThisMonth = {};
+      events.forEach(function(e){ if(e.year === year && e.month === month) eventDaysThisMonth[e.day] = true; });
+      renderCalGrid(year, month, todayDate, eventDaysThisMonth);
+
+      list.innerHTML = '';
+      if(events.length === 0){
+        emptyState(list, 'No upcoming earnings dates found for your current holdings and watchlist in the next few months.');
+        return;
+      }
+      events.forEach(function(e){
+        var li = document.createElement('li');
+        var dateLabel = CAL_MONTH_NAMES[e.month].slice(0, 3) + ' ' + e.day;
+        li.innerHTML = '<span class="cal-date">' + dateLabel + '</span>' +
+          '<span class="cal-pill">' + e.sym + '</span><span class="cal-title">Earnings Call</span>' +
+          '<span class="cal-time">' + (e.time || '') + '</span>';
+        list.appendChild(li);
+      });
+    })
+    .catch(function(){
+      renderCalGrid(year, month, todayDate, null);
+      emptyState(list, "Couldn't load earnings dates right now.");
+    });
 }
-buildCalendar();
 
 // Heuristic only (no real security-type data source wired up yet): mutual funds are
 // conventionally a 5-letter ticker ending in X; everything else known here is a short
@@ -152,6 +199,7 @@ function saveEditOverlay(){
 function removeEditPosition(){
   if(currentEditLi) currentEditLi.remove();
   closeEditOverlay();
+  buildCalendar();
 }
 
 function toggleConnector(btn){
@@ -202,16 +250,21 @@ addForm.addEventListener('submit', function(e){
       li2.innerHTML = '<span class="sym">' + sym + '</span><span class="name">' + displayName + '</span>' +
         '<span class="price">' + priceStr + '</span><span class="chg ' + chgClass + '">' + chgStr + '</span>' +
         '<button class="edit-btn" onclick="openEditOverlay(this)" aria-label="View details">›</button>' +
-        '<button class="remove-btn" onclick="this.closest(\'li\').remove()">✕</button>';
+        '<button class="remove-btn" onclick="removeWatchlistRow(this)">✕</button>';
       document.getElementById('watchlistList').appendChild(li2);
       WATCHLIST_MATCH[sym] = matchKeyword;
       renderFilteredStories('watchlistStories', WATCHLIST_MATCH, 'watchlist');
     }
+    buildCalendar();
   });
 });
 
+function removeWatchlistRow(btn){
+  btn.closest('li').remove();
+  buildCalendar();
+}
+
 // ---- Real news, fetched from the Cloudflare Worker RSS proxy ----
-var NEWS_API = 'https://daybook-research.ttverner.workers.dev/';
 var newsPool = [];
 
 var PORTFOLIO_MATCH = { AAPL:'Apple', MSFT:'Microsoft', NVDA:'Nvidia', AMZN:'Amazon', JPM:'JPMorgan', VOO:'Vanguard', FXAIX:'Fidelity' };
@@ -255,8 +308,7 @@ function applyQuoteToLi(li, quote){
 
 function loadQuotes(){
   var rows = document.querySelectorAll('#portfolioStocks [data-sym], #portfolioETFs [data-sym], #portfolioFunds [data-sym], #watchlistList [data-sym]');
-  var syms = [];
-  rows.forEach(function(li){ if(syms.indexOf(li.dataset.sym) === -1) syms.push(li.dataset.sym); });
+  var syms = collectHeldSymbols();
   if(!syms.length) return;
   fetch(NEWS_API + 'quotes?symbols=' + encodeURIComponent(syms.join(',')))
     .then(function(res){ return res.json(); })
@@ -355,6 +407,7 @@ function loadNews(){
 }
 loadNews();
 loadQuotes();
+buildCalendar();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){

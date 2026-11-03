@@ -1,7 +1,8 @@
-// Daybook backend — one Cloudflare Worker, three routes:
+// Daybook backend — one Cloudflare Worker, four routes:
 //   GET /            -> real news headlines (NYT, MarketWatch, CNBC RSS, server-side to dodge CORS)
-//   GET /quotes?symbols=AAPL,MSFT  -> real price + day change via Finnhub (free tier)
+//   GET /quotes?symbols=AAPL,MSFT  -> real price + day change + company name via Finnhub (free tier)
 //   GET /explain?symbol=NVDA&name=Nvidia  -> a grounded "why is it moving" summary via Workers AI
+//   GET /earnings?symbols=AAPL,MSFT  -> each symbol's next real earnings-call date via Finnhub
 //
 // Requires two things set in the Cloudflare dashboard (Worker > Settings):
 //   - Secret "FINNHUB_API_KEY": a free key from finnhub.io
@@ -31,6 +32,7 @@ export default {
     try {
       if (url.pathname === '/quotes') return await handleQuotes(url, env);
       if (url.pathname === '/explain') return await handleExplain(url, env);
+      if (url.pathname === '/earnings') return await handleEarnings(url, env);
       return await handleNews();
     } catch (err) {
       return json({ error: String(err) }, 500);
@@ -147,6 +149,37 @@ async function handleQuotes(url, env) {
   const quotes = {};
   for (const [sym, quote] of pairs) quotes[sym] = quote;
   return json({ quotes }, 200, 60);
+}
+
+// ---- /earnings (Finnhub earnings calendar) ----
+
+async function handleEarnings(url, env) {
+  const symbols = (url.searchParams.get('symbols') || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+  if (!symbols.length) return json({ error: 'no symbols given' }, 400);
+  if (!env.FINNHUB_API_KEY) return json({ error: 'FINNHUB_API_KEY not configured' }, 500);
+
+  const today = new Date();
+  const from = today.toISOString().slice(0, 10);
+  // ~5 months out: companies report quarterly, so this window reliably catches the next one.
+  const to = new Date(today.getTime() + 150 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const pairs = await Promise.all(symbols.map(async (sym) => {
+    try {
+      const res = await fetch(`https://finnhub.io/api/v1/calendar/earnings?from=${from}&to=${to}&symbol=${encodeURIComponent(sym)}&token=${env.FINNHUB_API_KEY}`);
+      if (!res.ok) return [sym, null];
+      const data = await res.json();
+      const list = (data && data.earningsCalendar) || [];
+      const upcoming = list.filter((e) => e.date >= from).sort((a, b) => a.date.localeCompare(b.date))[0];
+      if (!upcoming) return [sym, null];
+      return [sym, { date: upcoming.date, hour: upcoming.hour || '' }];
+    } catch (err) {
+      return [sym, null];
+    }
+  }));
+
+  const earnings = {};
+  for (const [sym, info] of pairs) earnings[sym] = info;
+  return json({ earnings }, 200, 3600);
 }
 
 // ---- /explain (news match + Workers AI, grounded only) ----
