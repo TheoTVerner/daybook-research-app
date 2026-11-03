@@ -509,8 +509,11 @@ function createSpotifyShowCard(show){
   var card = document.createElement('div');
   card.className = 'podcast-card';
 
-  var art = document.createElement('div');
+  var episodeUrl = (show.latestEpisode && show.latestEpisode.url) || show.url || 'https://open.spotify.com';
+  var art = document.createElement('a');
   art.className = 'pod-art';
+  art.href = episodeUrl; art.target = '_blank'; art.rel = 'noopener';
+  art.setAttribute('aria-label', 'Open ' + show.name + ' in Spotify');
   if(show.image){
     var img = document.createElement('img');
     img.className = 'pod-art-img';
@@ -523,12 +526,9 @@ function createSpotifyShowCard(show){
     mono.textContent = (show.name || '?').slice(0, 3).toUpperCase();
     art.appendChild(mono);
   }
-  var episodeUrl = (show.latestEpisode && show.latestEpisode.url) || show.url || 'https://open.spotify.com';
-  var play = document.createElement('a');
+  var play = document.createElement('span');
   play.className = 'play-btn';
-  play.href = episodeUrl; play.target = '_blank'; play.rel = 'noopener';
   play.textContent = '▶';
-  play.setAttribute('aria-label', 'Open in Spotify');
   art.appendChild(play);
   card.appendChild(art);
 
@@ -548,9 +548,12 @@ function createPodcastCard(show, variantIndex){
   var card = document.createElement('div');
   card.className = 'podcast-card';
 
-  var art = document.createElement('div');
-  art.className = 'pod-art v' + ((variantIndex % 4) + 1);
   var ep = show.episode;
+  var link = (ep && ep.link) || 'https://open.spotify.com/search/' + encodeURIComponent(show.name);
+  var art = document.createElement('a');
+  art.className = 'pod-art v' + ((variantIndex % 4) + 1);
+  art.href = link; art.target = '_blank'; art.rel = 'noopener';
+  art.setAttribute('aria-label', 'Listen to ' + show.name);
   if(ep && ep.image){
     var img = document.createElement('img');
     img.className = 'pod-art-img';
@@ -563,12 +566,9 @@ function createPodcastCard(show, variantIndex){
     mono.textContent = show.name.split(' ').map(function(w){ return w[0] || ''; }).join('').slice(0, 3).toUpperCase();
     art.appendChild(mono);
   }
-  var link = (ep && ep.link) || 'https://open.spotify.com/search/' + encodeURIComponent(show.name);
-  var play = document.createElement('a');
+  var play = document.createElement('span');
   play.className = 'play-btn';
-  play.href = link; play.target = '_blank'; play.rel = 'noopener';
   play.textContent = '▶';
-  play.setAttribute('aria-label', 'Listen to ' + show.name);
   art.appendChild(play);
   card.appendChild(art);
 
