@@ -159,7 +159,7 @@ function computePositionValue(li, shares){
 }
 
 function formatPositionValue(value){
-  if(value === null) return '—';
+  if(value === null || value === undefined || isNaN(value)) return '—';
   return '$' + value.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
@@ -562,7 +562,8 @@ function hydratePortfolioFromStorage(){
   items.forEach(function(it){
     var li = buildPortfolioLi(it.sym, it.name, it.type, it.price, it.chg, it.chgClass);
     li.querySelector('.qty-display').textContent = it.shares + ' sh';
-    li.querySelector('.val-display').textContent = formatPositionValue(it.value);
+    var savedValue = (it.value === undefined || it.value === null) ? computePositionValue(li, it.shares) : it.value;
+    li.querySelector('.val-display').textContent = formatPositionValue(savedValue);
     document.getElementById(GROUP_LIST_IDS[it.type] || 'portfolioStocks').appendChild(li);
     if(it.matchKeyword){ PORTFOLIO_MATCH[it.sym] = it.matchKeyword; NAME_HINTS[it.sym] = it.matchKeyword; }
   });
