@@ -27,6 +27,17 @@ var PANEL_ORDER = ['markets', 'portfolio', 'watchlist', 'manage', 'calendar'];
 var currentPanelName = 'markets';
 var prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+// NOTE: iOS Safari (including installed PWAs like this one) has never implemented the
+// Vibration API -- navigator.vibrate() is always undefined there, so this is a guaranteed
+// no-op on an iPhone. It's wired up anyway since it costs nothing and works on browsers
+// that do support it (Android Chrome, etc.); there's no public web API for real haptics on iOS.
+function haptic(style){
+  try{
+    if(!navigator.vibrate) return;
+    navigator.vibrate(style === 'light' ? 8 : style === 'success' ? [10, 30, 10] : 15);
+  }catch(e){}
+}
+
 function triggerTabPillAnim(tabEl){
   var wrap = tabEl.querySelector('.tab-icon-wrap');
   if(!wrap) return;
@@ -50,8 +61,8 @@ function animatePanelSlide(fromPanel, toPanel, forward){
   fromPanel.style.transition = 'none';
   fromPanel.style.transform = 'translateX(0)';
   void toPanel.offsetWidth; // force reflow before enabling the transition
-  toPanel.style.transition = 'transform .32s cubic-bezier(.25,.8,.35,1)';
-  fromPanel.style.transition = 'transform .32s cubic-bezier(.25,.8,.35,1)';
+  toPanel.style.transition = 'transform .42s cubic-bezier(.25,.8,.35,1)';
+  fromPanel.style.transition = 'transform .42s cubic-bezier(.25,.8,.35,1)';
   toPanel.style.transform = 'translateX(0)';
   fromPanel.style.transform = 'translateX(' + (-100 * dir) + '%)';
   var finished = false;
@@ -66,7 +77,7 @@ function animatePanelSlide(fromPanel, toPanel, forward){
     toPanel.removeEventListener('transitionend', finish);
   }
   toPanel.addEventListener('transitionend', finish);
-  setTimeout(finish, 420); // safety net in case transitionend never fires
+  setTimeout(finish, 520); // safety net in case transitionend never fires
 }
 
 function switchTab(name){
@@ -85,7 +96,7 @@ function switchTab(name){
   });
 }
 document.querySelectorAll('.tab').forEach(function(t){
-  t.addEventListener('click', function(){ switchTab(t.dataset.tab); });
+  t.addEventListener('click', function(){ haptic('light'); switchTab(t.dataset.tab); });
 });
 
 // Collapses the masthead up as the active panel scrolls down, like an iOS large-title bar.
@@ -100,6 +111,74 @@ function initMastheadCollapse(){
   });
 }
 initMastheadCollapse();
+
+// ---- Pull-to-refresh on the three live-data panels -- custom gesture since Safari's own
+// overscroll bounce is suppressed app-wide (overscroll-behavior:none). Fire-and-forget: the
+// loaders below already work that way everywhere else in this app, so the spinner's own
+// minimum-visible time is what makes the refresh feel complete, not a promise chain. ----
+var PULL_THRESHOLD = 64; // px of drag past the top before a release triggers a refresh
+var PULL_MAX = 90; // visual cap on how far the indicator can be dragged
+
+function performPullRefresh(){
+  loadMarketIndices();
+  loadQuotes();
+  loadNews();
+  loadPodcastFeeds();
+}
+
+function setupPullToRefresh(panelId, indicatorId){
+  var panel = document.getElementById(panelId);
+  var indicator = document.getElementById(indicatorId);
+  if(!panel || !indicator) return;
+  var startY = 0, dragging = false, ready = false, refreshing = false;
+
+  panel.addEventListener('touchstart', function(e){
+    if(panel.scrollTop > 0 || refreshing){ dragging = false; return; }
+    startY = e.touches[0].clientY;
+    dragging = true;
+    ready = false;
+    indicator.classList.remove('snap');
+  }, { passive: true });
+
+  panel.addEventListener('touchmove', function(e){
+    if(!dragging) return;
+    var dy = e.touches[0].clientY - startY;
+    if(dy <= 0){ indicator.style.height = '0px'; return; }
+    var pulled = Math.min(dy * 0.45, PULL_MAX);
+    indicator.style.height = pulled + 'px';
+    var nowReady = pulled >= PULL_THRESHOLD;
+    if(nowReady && !ready) haptic('light');
+    ready = nowReady;
+    indicator.classList.toggle('ready', ready);
+  }, { passive: true });
+
+  function endDrag(){
+    if(!dragging) return;
+    dragging = false;
+    indicator.classList.add('snap');
+    if(ready && !refreshing){
+      refreshing = true;
+      indicator.style.height = '44px';
+      indicator.classList.add('refreshing');
+      indicator.classList.remove('ready');
+      performPullRefresh();
+      setTimeout(function(){
+        indicator.style.height = '0px';
+        indicator.classList.remove('refreshing');
+        refreshing = false;
+      }, 700);
+    } else {
+      indicator.style.height = '0px';
+      indicator.classList.remove('ready');
+    }
+  }
+  panel.addEventListener('touchend', endDrag, { passive: true });
+  panel.addEventListener('touchcancel', endDrag, { passive: true });
+}
+
+setupPullToRefresh('panel-markets', 'pullRefreshMarkets');
+setupPullToRefresh('panel-portfolio', 'pullRefreshPortfolio');
+setupPullToRefresh('panel-watchlist', 'pullRefreshWatchlist');
 
 function updateDate(){
   try{
@@ -444,6 +523,7 @@ function saveResearchNotes(){
   var text = document.getElementById('researchNotesInput').value;
   if(text.trim()) notes[sym] = text; else delete notes[sym];
   try{ localStorage.setItem(RESEARCH_NOTES_KEY, JSON.stringify(notes)); }catch(e){}
+  haptic('success');
   var hint = document.getElementById('researchSavedHint');
   hint.hidden = false;
   clearTimeout(saveResearchNotes._t);
@@ -465,12 +545,14 @@ function saveEditOverlay(){
   }
   persistPortfolio();
   syncAllTickerTapes();
+  haptic('success');
   closeEditOverlay();
 }
 
 function removeEditPosition(){
   var wasWatchlist = currentEditLi && !!currentEditLi.closest('#watchlistList');
   if(currentEditLi) currentEditLi.remove();
+  haptic('medium');
   closeEditOverlay();
   buildCalendar();
   syncPushSymbols();
@@ -533,6 +615,7 @@ addForm.addEventListener('submit', function(e){
 
 function removeWatchlistRow(btn){
   btn.closest('li').remove();
+  haptic('medium');
   buildCalendar();
   syncPushSymbols();
   syncAllTickerTapes();

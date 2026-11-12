@@ -55,6 +55,15 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 .panel-stack{ position:relative; flex:1; overflow:hidden; }
 .panel{ position:absolute; inset:0; overflow-y:auto; -webkit-overflow-scrolling:touch; background:var(--app-body); color:var(--app-ink); }
 .panel[hidden]{ display:none; }
+
+/* Pull-to-refresh indicator -- see setupPullToRefresh() in app.js */
+.pull-refresh{ height:0; display:flex; align-items:center; justify-content:center; overflow:hidden; color:var(--app-ink-soft); }
+.pull-refresh.snap{ transition:height .2s ease; }
+.pull-refresh-spinner{ width:18px; height:18px; border-radius:50%; border:2px solid var(--app-rule); border-top-color:var(--app-crimson);
+  transform:rotate(0deg); transition:transform .1s linear; }
+.pull-refresh.refreshing .pull-refresh-spinner{ animation:pullRefreshSpin .6s linear infinite; }
+.pull-refresh.ready .pull-refresh-spinner{ border-top-color:var(--app-crimson); border-width:2.5px; }
+@keyframes pullRefreshSpin{ to{ transform:rotate(360deg); } }
 .section-label{ font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--app-ink-soft); font-weight:700;
   padding:14px 18px 7px; }
 .section-label.first{ padding-top:16px; }
@@ -162,7 +171,7 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
   from{ clip-path:circle(0px at 50% 50%); }
   to{ clip-path:circle(farthest-corner at 50% 50%); }
 }
-.tab-icon-wrap.pill-anim{ animation:tabPillIn .32s cubic-bezier(.25,.8,.35,1) forwards; }
+.tab-icon-wrap.pill-anim{ animation:tabPillIn .42s cubic-bezier(.25,.8,.35,1) forwards; }
 @media (prefers-reduced-motion:reduce){ .tab-icon-wrap.pill-anim{ animation:none !important; } }
 
 /* ---- full-page position editor, styled like a trading terminal ---- */

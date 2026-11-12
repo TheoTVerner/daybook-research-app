@@ -25,7 +25,15 @@
 // (volatility ETPs decay and diverge from spot VIX), so it's real-symbol-or-nothing.
 // Oil uses the USO ETF's own real price directly (no proxy ETF for WTI itself). The 10-
 // year yield comes straight from the US Treasury's own public daily-rates CSV feed (no
-// key needed). Bitcoin comes from CoinGecko's public, keyless simple-price endpoint.
+// key needed). Bitcoin comes from Coinbase's public spot-price endpoint (CoinGecko's
+// equivalent endpoint silently failed when called from this Worker -- same shared-IP-range
+// blocking pattern seen with Apple's iTunes API, confirmed by curling both endpoints
+// directly from outside Cloudflare, where CoinGecko also returned 200). Nasdaq's real
+// Composite symbol isn't resolvable here either, so it falls back to QQQ (Nasdaq-100)
+// scaled by ~37x, today's approximate Composite/QQQ ratio -- unlike SPY/DIA/IWM's fixed,
+// structural ratios this one will drift slowly over time and need the occasional
+// recalibration, but the two indices are so tightly correlated day to day that the
+// displayed move is still accurate even when the recalibration lags.
 //
 // Requires these set in the Cloudflare dashboard (Worker > Settings):
 //   - Secret "FINNHUB_API_KEY": a free key from finnhub.io
@@ -237,7 +245,7 @@ async function handleQuotes(url, env) {
 const INDEX_DEFS = [
   { key: 'sp500', label: 'S&P 500', realSymbol: '^GSPC', proxySymbol: 'SPY', proxyMultiplier: 10 },
   { key: 'dow', label: 'DOW', realSymbol: '^DJI', proxySymbol: 'DIA', proxyMultiplier: 100 },
-  { key: 'nasdaq', label: 'NASDAQ', realSymbol: '^IXIC', proxySymbol: 'QQQ', proxyMultiplier: null },
+  { key: 'nasdaq', label: 'NASDAQ', realSymbol: '^IXIC', proxySymbol: 'QQQ', proxyMultiplier: 37 },
   { key: 'russell2000', label: 'RUSSELL 2K', realSymbol: '^RUT', proxySymbol: 'IWM', proxyMultiplier: 10 },
   { key: 'vix', label: 'VIX', realSymbol: '^VIX', proxySymbol: null, proxyMultiplier: null }
 ];
@@ -275,17 +283,48 @@ async function resolveOil(env) {
   return { key: 'wti', label: 'WTI CRUDE', value: proxy.c, changePercent: proxy.dp, format: 'currency2dp', deltaDisplay: 'percent', source: 'proxy:USO' };
 }
 
-async function resolveBitcoin() {
+var BTC_UNAVAILABLE = { key: 'btc', label: 'BITCOIN', value: null, changePercent: null, format: 'currency0dp', deltaDisplay: 'percent', source: 'unavailable' };
+
+async function resolveBitcoinFromCoinbase() {
   try {
-    const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true');
-    if (!res.ok) return { key: 'btc', label: 'BITCOIN', value: null, changePercent: null, format: 'currency0dp', deltaDisplay: 'percent', source: 'unavailable' };
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const [nowRes, pastRes] = await Promise.all([
+      fetch('https://api.coinbase.com/v2/prices/BTC-USD/spot'),
+      fetch('https://api.coinbase.com/v2/prices/BTC-USD/spot?date=' + dayAgo)
+    ]);
+    if (!nowRes.ok) return null;
+    const nowData = await nowRes.json();
+    const price = nowData && nowData.data && parseFloat(nowData.data.amount);
+    if (!price || isNaN(price)) return null;
+    let changePercent = null;
+    if (pastRes.ok) {
+      const pastData = await pastRes.json();
+      const pastPrice = pastData && pastData.data && parseFloat(pastData.data.amount);
+      if (pastPrice && !isNaN(pastPrice) && pastPrice !== 0) changePercent = ((price - pastPrice) / pastPrice) * 100;
+    }
+    return { key: 'btc', label: 'BITCOIN', value: price, changePercent, format: 'currency0dp', deltaDisplay: 'percent', source: 'coinbase' };
+  } catch (err) {
+    return null;
+  }
+}
+
+async function resolveBitcoinFromCoinGecko() {
+  try {
+    const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DaybookNewsProxy/1.0)' }
+    });
+    if (!res.ok) return null;
     const data = await res.json();
     const btc = data && data.bitcoin;
-    if (!btc || typeof btc.usd !== 'number') return { key: 'btc', label: 'BITCOIN', value: null, changePercent: null, format: 'currency0dp', deltaDisplay: 'percent', source: 'unavailable' };
+    if (!btc || typeof btc.usd !== 'number') return null;
     return { key: 'btc', label: 'BITCOIN', value: btc.usd, changePercent: btc.usd_24h_change, format: 'currency0dp', deltaDisplay: 'percent', source: 'coingecko' };
   } catch (err) {
-    return { key: 'btc', label: 'BITCOIN', value: null, changePercent: null, format: 'currency0dp', deltaDisplay: 'percent', source: 'unavailable' };
+    return null;
   }
+}
+
+async function resolveBitcoin() {
+  return (await resolveBitcoinFromCoinbase()) || (await resolveBitcoinFromCoinGecko()) || BTC_UNAVAILABLE;
 }
 
 // US Treasury's own public daily par-yield-curve feed -- no key, CSV, newest row first.
