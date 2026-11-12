@@ -102,6 +102,8 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 .holdings-list, .watch-list{ list-style:none; margin:0; padding:0 18px; }
 .holdings-list li, .watch-list li{ display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid var(--app-rule);
   font-size:12.5px; font-variant-numeric:tabular-nums; }
+.holdings-list li{ cursor:pointer; margin:0 -18px; padding-left:18px; padding-right:18px; transition:background-color .15s ease; }
+.holdings-list li:active{ background-color:var(--app-card); }
 .sym{ font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:14px; width:48px; flex:none; color:var(--app-crimson); }
 .name{ flex:1; min-width:0; color:var(--app-ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .qty{ width:44px; flex:none; color:var(--app-ink-soft); text-align:right; }
@@ -156,23 +158,30 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 .cal-title{ flex:1; min-width:0; }
 .cal-time{ flex:none; color:var(--app-ink-soft); font-size:11px; }
 
-.tabbar{ flex:none; display:flex; align-items:stretch;
+.tabbar{ flex:none; display:flex; align-items:stretch; overflow:hidden;
   height:calc(49px + env(safe-area-inset-bottom,0px)); padding-bottom:env(safe-area-inset-bottom,0px);
-  background:var(--app-navy); border-top:1px solid rgba(255,255,255,.08); }
+  background:var(--app-navy); border-top:1px solid rgba(255,255,255,.08);
+  transition:height .25s ease, padding-bottom .25s ease, opacity .2s ease, border-color .2s ease; }
 .tab{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none;
   color:var(--app-silver); position:relative; padding:0; }
-.tab-icon-wrap{ display:flex; align-items:center; justify-content:center; width:48px; height:34px; border-radius:17px; }
-.tab svg{ width:23px; height:23px; stroke:currentColor; fill:none; stroke-width:1.8; }
+.tab-icon-wrap{ position:relative; display:flex; align-items:center; justify-content:center; width:48px; height:34px; }
+.tab-icon-pill{ position:absolute; inset:0; z-index:0; border-radius:17px; background:transparent; }
+.tab.active .tab-icon-pill{ background:var(--app-crimson); }
+.tab svg{ position:relative; z-index:1; width:23px; height:23px; stroke:currentColor; fill:none; stroke-width:1.8; }
 .tab.active{ color:#fff; }
-.tab.active .tab-icon-wrap{ background:var(--app-crimson); }
 
-/* Flows out from the icon's center when a tab becomes active -- see triggerTabPillAnim() in app.js */
+/* Collapses away as the active panel scrolls down -- see initMastheadCollapse() in app.js */
+.tabbar.collapsed{ height:0; padding-bottom:0; opacity:0; border-color:transparent; }
+
+/* Flows out from the icon's center when a tab becomes active -- the pill is a separate layer
+   behind the icon (see triggerTabPillAnim() in app.js) so the icon itself never gets clipped
+   and stays put while only the highlight bursts outward. */
 @keyframes tabPillIn{
   from{ clip-path:circle(0px at 50% 50%); }
   to{ clip-path:circle(farthest-corner at 50% 50%); }
 }
-.tab-icon-wrap.pill-anim{ animation:tabPillIn .42s cubic-bezier(.25,.8,.35,1) forwards; }
-@media (prefers-reduced-motion:reduce){ .tab-icon-wrap.pill-anim{ animation:none !important; } }
+.tab-icon-pill.pill-anim{ animation:tabPillIn .42s cubic-bezier(.25,.8,.35,1) forwards; }
+@media (prefers-reduced-motion:reduce){ .tab-icon-pill.pill-anim{ animation:none !important; } }
 
 /* ---- full-page position editor, styled like a trading terminal ---- */
 .edit-overlay[hidden]{ display:none; }

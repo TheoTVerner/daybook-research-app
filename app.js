@@ -39,11 +39,11 @@ function haptic(style){
 }
 
 function triggerTabPillAnim(tabEl){
-  var wrap = tabEl.querySelector('.tab-icon-wrap');
-  if(!wrap) return;
-  wrap.classList.remove('pill-anim');
-  void wrap.offsetWidth; // force reflow so the animation restarts on repeat taps
-  wrap.classList.add('pill-anim');
+  var pill = tabEl.querySelector('.tab-icon-pill');
+  if(!pill) return;
+  pill.classList.remove('pill-anim');
+  void pill.offsetWidth; // force reflow so the animation restarts on repeat taps
+  pill.classList.add('pill-anim');
 }
 
 // Slides the outgoing panel out while the incoming one slides in from the matching side,
@@ -102,9 +102,24 @@ document.querySelectorAll('.tab').forEach(function(t){
 // Collapses the masthead up as the active panel scrolls down, like an iOS large-title bar.
 function initMastheadCollapse(){
   var masthead = document.querySelector('.masthead');
+  var tabbar = document.querySelector('.tabbar');
   if(!masthead) return;
+  var lastScrollTop = new WeakMap();
   function handleScroll(e){
-    masthead.classList.toggle('collapsed', e.currentTarget.scrollTop > 12);
+    var panel = e.currentTarget;
+    var top = panel.scrollTop;
+    masthead.classList.toggle('collapsed', top > 12);
+    if(tabbar){
+      var last = lastScrollTop.has(panel) ? lastScrollTop.get(panel) : 0;
+      if(top <= 4){
+        tabbar.classList.remove('collapsed'); // always show it once back at the top
+      } else if(top > last + 2){
+        tabbar.classList.add('collapsed'); // scrolling down -- hide it
+      } else if(top < last - 2){
+        tabbar.classList.remove('collapsed'); // scrolling up -- bring it back
+      }
+    }
+    lastScrollTop.set(panel, top);
   }
   document.querySelectorAll('.panel').forEach(function(p){
     p.addEventListener('scroll', handleScroll, { passive: true });
@@ -284,6 +299,22 @@ function guessSecurityType(sym){
   return 'stock';
 }
 var GROUP_LIST_IDS = { stock:'portfolioStocks', etf:'portfolioETFs', fund:'portfolioFunds' };
+
+// Any tap on a portfolio row opens its detail page, not just the pencil button -- delegated
+// on the list containers so it covers both the static demo rows and ones rebuilt later from
+// localStorage or added through the form. The pencil's own onclick leads to the exact same
+// place, so it's excluded here rather than left to fire twice.
+Object.keys(GROUP_LIST_IDS).forEach(function(type){
+  var list = document.getElementById(GROUP_LIST_IDS[type]);
+  if(!list) return;
+  list.addEventListener('click', function(e){
+    if(e.target.closest('.edit-btn')) return;
+    var li = e.target.closest('li[data-sym]');
+    if(!li) return;
+    haptic('light');
+    openEditOverlayForLi(li);
+  });
+});
 
 var currentEditLi = null;
 
