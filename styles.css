@@ -7,7 +7,7 @@
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html,body{ height:100%; margin:0; }
 body{
-  font-family:'Inter',system-ui,sans-serif;
+  font-family:'IBM Plex Sans',system-ui,sans-serif;
   background:var(--app-navy);
   overflow:hidden;
   overscroll-behavior:none;
@@ -24,7 +24,7 @@ body{
 .masthead{ position:relative; flex:none; background:var(--app-navy); color:#fff;
   padding:calc(6.5px + env(safe-area-inset-top,0px)) 18px 7px; text-align:center;
   border-bottom:3px solid var(--app-crimson); transition:padding .25s ease; }
-.masthead-title{ font-family:'Source Serif 4',Georgia,serif; font-weight:700; font-size:24px; margin:0; letter-spacing:.01em;
+.masthead-title{ font-family:'Fraunces',Georgia,serif; font-weight:700; font-size:24px; margin:0; letter-spacing:.01em;
   transition:font-size .25s ease; }
 .masthead-date{ font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--app-silver); margin:2px 0 0;
   max-height:16px; opacity:1; overflow:hidden; transition:max-height .25s ease, opacity .2s ease, margin .25s ease; }
@@ -77,7 +77,7 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 .story-meta .dot{ opacity:.5; }
 .ticker-pill{ margin-left:auto; background:var(--app-crimson); color:#fff; font-family:'Barlow Condensed',sans-serif; font-weight:700;
   font-size:11px; letter-spacing:.03em; padding:2px 8px; border-radius:4px; }
-.story-head{ font-family:'Source Serif 4',Georgia,serif; font-weight:700; font-size:16.5px; line-height:1.28; margin:0 0 5px; }
+.story-head{ font-family:'Fraunces',Georgia,serif; font-weight:700; font-size:16.5px; line-height:1.28; margin:0 0 5px; }
 .story-head a{ color:var(--app-ink); text-decoration:none; }
 .story-head a:hover{ text-decoration:underline; }
 .story-dek{ font-size:12.5px; line-height:1.5; color:var(--app-ink-soft); margin:0; }
@@ -111,7 +111,7 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 .chg{ width:56px; flex:none; text-align:right; font-weight:700; }
 .chg.up{ color:var(--app-up); } .chg.down{ color:var(--app-down); }
 .val{ width:66px; flex:none; text-align:right; font-weight:600; }
-.qty-input, .val-input{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; text-align:right; background:var(--app-card);
+.qty-input, .val-input{ font-family:'IBM Plex Sans',sans-serif; font-variant-numeric:tabular-nums; text-align:right; background:var(--app-card);
   color:var(--app-ink); border:1px solid var(--app-crimson); border-radius:4px; font-size:12px; padding:2px 4px; }
 .qty-input{ width:44px; flex:none; }
 .val-input{ width:66px; flex:none; }
@@ -122,7 +122,7 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 
 .add-form{ padding:4px 18px 6px; }
 .add-form input{ width:100%; padding:10px 12px; border:1px solid var(--app-rule); border-radius:8px; font-size:13px;
-  font-family:'Inter',sans-serif; margin-bottom:8px; background:var(--app-card); color:var(--app-ink); }
+  font-family:'IBM Plex Sans',sans-serif; margin-bottom:8px; background:var(--app-card); color:var(--app-ink); }
 .add-actions{ display:flex; gap:8px; }
 .btn{ flex:1; padding:9px 0; border-radius:8px; font-size:12.5px; font-weight:700; border:1px solid transparent; }
 .btn-crimson{ background:var(--app-crimson); color:#fff; }
@@ -183,17 +183,18 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 .tab-icon-pill.pill-anim{ animation:tabPillIn .42s cubic-bezier(.25,.8,.35,1) forwards; }
 @media (prefers-reduced-motion:reduce){ .tab-icon-pill.pill-anim{ animation:none !important; } }
 
-/* ---- full-page position editor, styled like a trading terminal ---- */
+/* ---- full-page position editor/summary -- a darker shade of the app's own navy
+   (--app-navy-deep), not the unrelated near-black used by the ticker tapes ---- */
 .edit-overlay[hidden]{ display:none; }
-.edit-overlay{ position:fixed; inset:0; z-index:50; background:var(--terminal-bg); color:var(--terminal-fg);
+.edit-overlay{ position:fixed; inset:0; z-index:50; background:var(--app-navy-deep); color:var(--terminal-fg);
   display:flex; flex-direction:column; overflow-y:auto; -webkit-overflow-scrolling:touch;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
   padding-left:env(safe-area-inset-left,0px); padding-right:env(safe-area-inset-right,0px); }
 .edit-header{ flex:none; position:sticky; top:0; z-index:2; display:flex; align-items:center; justify-content:space-between; padding:14px 18px;
-  background:var(--terminal-bg); border-bottom:1px solid rgba(255,255,255,.12); }
+  background:var(--app-navy-deep); border-bottom:1px solid rgba(255,255,255,.12); }
 .edit-header-title{ font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
   font-size:13px; color:var(--terminal-fg); }
-.edit-cancel, .edit-save{ background:none; border:none; font-size:14px; font-weight:700; padding:4px; font-family:'Inter',sans-serif; }
+.edit-cancel, .edit-save{ background:none; border:none; font-size:14px; font-weight:700; padding:4px; font-family:'IBM Plex Sans',sans-serif; }
 .edit-cancel{ color:var(--terminal-fg); opacity:.65; }
 .edit-save{ color:var(--terminal-amber); }
 .edit-ticker-row{ flex:none; display:flex; align-items:baseline; gap:10px; padding:22px 18px 4px; }
@@ -215,16 +216,16 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 .edit-field{ display:flex; flex-direction:column; gap:6px; }
 .edit-field span{ font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:rgba(231,233,238,.55); font-weight:700; }
 .edit-field input, .edit-field select{ background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.22); border-radius:8px;
-  color:#fff; font-size:16px; padding:11px 12px; font-variant-numeric:tabular-nums; font-family:'Inter',sans-serif; }
+  color:#fff; font-size:16px; padding:11px 12px; font-variant-numeric:tabular-nums; font-family:'IBM Plex Sans',sans-serif; }
 .edit-value-readout{ margin:0; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.14); border-radius:8px;
-  color:rgba(255,255,255,.85); font-size:16px; padding:11px 12px; font-variant-numeric:tabular-nums; font-family:'Inter',sans-serif; }
+  color:rgba(255,255,255,.85); font-size:16px; padding:11px 12px; font-variant-numeric:tabular-nums; font-family:'IBM Plex Sans',sans-serif; }
 .edit-remove{ flex:none; margin:8px 18px 24px; padding:13px 0; border-radius:8px; border:1px solid var(--app-down);
   background:none; color:#ff6f6f; font-weight:700; font-size:13px; }
 
 .edit-chart{ flex:none; padding:4px 18px 18px; border-top:1px solid rgba(255,255,255,.1); }
 .chart-tabs{ display:flex; gap:4px; margin:14px 0 12px; }
 .chart-tab{ flex:1; padding:6px 0; border-radius:6px; border:1px solid rgba(255,255,255,.18); background:none;
-  color:rgba(231,233,238,.6); font-size:11px; font-weight:700; font-family:'Inter',sans-serif; letter-spacing:.02em; }
+  color:rgba(231,233,238,.6); font-size:11px; font-weight:700; font-family:'IBM Plex Sans',sans-serif; letter-spacing:.02em; }
 .chart-tab.active{ background:var(--terminal-amber); border-color:var(--terminal-amber); color:#07210f; }
 .chart-row{ display:flex; gap:8px; }
 .chart-y-axis, .chart-y-axis-spacer{ flex:none; width:42px; }
@@ -240,7 +241,7 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 
 .edit-research{ flex:none; padding:4px 18px 18px; border-top:1px solid rgba(255,255,255,.1); }
 .research-textarea{ width:100%; margin-top:14px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.22);
-  border-radius:8px; color:#fff; font-size:13.5px; font-family:'Inter',sans-serif; padding:11px 12px; resize:vertical; }
+  border-radius:8px; color:#fff; font-size:13.5px; font-family:'IBM Plex Sans',sans-serif; padding:11px 12px; resize:vertical; }
 .research-textarea::placeholder{ color:rgba(231,233,238,.4); }
 .research-actions{ display:flex; align-items:center; gap:12px; margin-top:10px; }
 .research-actions .btn{ flex:none; padding:8px 18px; }
