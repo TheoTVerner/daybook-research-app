@@ -22,14 +22,22 @@ body{
 }
 
 .masthead{ position:relative; flex:none; background:var(--app-navy); color:#fff;
-  padding:calc(8px + env(safe-area-inset-top,0px)) 18px 9px; text-align:center;
-  border-bottom:3px solid var(--app-crimson); }
-.masthead-title{ font-family:'Source Serif 4',Georgia,serif; font-weight:700; font-size:30px; margin:0; letter-spacing:.01em; }
-.masthead-date{ font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--app-silver); margin:3px 0 0; }
-.masthead-icon{ position:absolute; top:calc(8px + env(safe-area-inset-top,0px)); right:18px;
-  width:32px; height:32px; border-radius:9px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2);
-  color:var(--app-silver); display:flex; align-items:center; justify-content:center; flex:none; }
-.masthead-icon svg{ width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:2; }
+  padding:calc(6.5px + env(safe-area-inset-top,0px)) 18px 7px; text-align:center;
+  border-bottom:3px solid var(--app-crimson); transition:padding .25s ease; }
+.masthead-title{ font-family:'Source Serif 4',Georgia,serif; font-weight:700; font-size:24px; margin:0; letter-spacing:.01em;
+  transition:font-size .25s ease; }
+.masthead-date{ font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--app-silver); margin:2px 0 0;
+  max-height:16px; opacity:1; overflow:hidden; transition:max-height .25s ease, opacity .2s ease, margin .25s ease; }
+.masthead-icon{ position:absolute; top:calc(6.5px + env(safe-area-inset-top,0px)); right:18px;
+  width:28px; height:28px; border-radius:8px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2);
+  color:var(--app-silver); display:flex; align-items:center; justify-content:center; flex:none; transition:top .25s ease; }
+.masthead-icon svg{ width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:2; }
+
+/* Collapses up as the active panel scrolls down -- see initMastheadCollapse() in app.js */
+.masthead.collapsed{ padding-top:calc(4px + env(safe-area-inset-top,0px)); padding-bottom:4px; }
+.masthead.collapsed .masthead-title{ font-size:17px; }
+.masthead.collapsed .masthead-date{ max-height:0; opacity:0; margin-top:0; }
+.masthead.collapsed .masthead-icon{ top:calc(4px + env(safe-area-inset-top,0px)); }
 
 .ticker-tape{ flex:none; overflow:hidden; background:var(--terminal-bg); border-bottom:1px solid #000; }
 .ticker-track{ display:flex; width:max-content; animation:scrollTicker 34s linear infinite; }
@@ -44,7 +52,9 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 .tick i{ font-style:normal; font-weight:700; }
 .tick i.up{ color:#3ad17a; } .tick i.down{ color:#ff5f5f; }
 
-.panel{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; background:var(--app-body); color:var(--app-ink); }
+.panel-stack{ position:relative; flex:1; overflow:hidden; }
+.panel{ position:absolute; inset:0; overflow-y:auto; -webkit-overflow-scrolling:touch; background:var(--app-body); color:var(--app-ink); }
+.panel[hidden]{ display:none; }
 .section-label{ font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--app-ink-soft); font-weight:700;
   padding:14px 18px 7px; }
 .section-label.first{ padding-top:16px; }
@@ -65,8 +75,8 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 .story-loading, .story-empty{ padding:28px 18px; font-size:13px; color:var(--app-ink-soft); text-align:center; line-height:1.5; }
 
 .podcast-row{ display:flex; gap:14px; overflow-x:auto; padding:2px 18px 12px; }
-.podcast-card{ flex:none; width:76px; text-align:center; }
-.pod-art{ width:76px; height:76px; border-radius:18px; display:flex; align-items:center; justify-content:center;
+.podcast-card{ flex:none; width:84px; text-align:center; }
+.pod-art{ width:84px; height:84px; border-radius:19px; display:flex; align-items:center; justify-content:center;
   position:relative; margin-bottom:6px; }
 .pod-art.v1{ background:linear-gradient(145deg,var(--app-crimson),#6e1f1f); }
 .pod-art.v2{ background:linear-gradient(145deg,var(--app-navy),#1c3f6e); }
@@ -138,14 +148,22 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 .cal-time{ flex:none; color:var(--app-ink-soft); font-size:11px; }
 
 .tabbar{ flex:none; display:flex; align-items:stretch;
-  height:calc(40px + env(safe-area-inset-bottom,0px)); padding-bottom:env(safe-area-inset-bottom,0px);
+  height:calc(49px + env(safe-area-inset-bottom,0px)); padding-bottom:env(safe-area-inset-bottom,0px);
   background:var(--app-navy); border-top:1px solid rgba(255,255,255,.08); }
 .tab{ flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none;
   color:var(--app-silver); position:relative; padding:0; }
-.tab-icon-wrap{ display:flex; align-items:center; justify-content:center; width:100%; height:100%; }
-.tab svg{ width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:1.8; }
+.tab-icon-wrap{ display:flex; align-items:center; justify-content:center; width:48px; height:34px; border-radius:17px; }
+.tab svg{ width:23px; height:23px; stroke:currentColor; fill:none; stroke-width:1.8; }
 .tab.active{ color:#fff; }
 .tab.active .tab-icon-wrap{ background:var(--app-crimson); }
+
+/* Flows out from the icon's center when a tab becomes active -- see triggerTabPillAnim() in app.js */
+@keyframes tabPillIn{
+  from{ clip-path:circle(0px at 50% 50%); }
+  to{ clip-path:circle(farthest-corner at 50% 50%); }
+}
+.tab-icon-wrap.pill-anim{ animation:tabPillIn .32s cubic-bezier(.25,.8,.35,1) forwards; }
+@media (prefers-reduced-motion:reduce){ .tab-icon-wrap.pill-anim{ animation:none !important; } }
 
 /* ---- full-page position editor, styled like a trading terminal ---- */
 .edit-overlay[hidden]{ display:none; }

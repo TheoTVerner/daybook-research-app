@@ -1,6 +1,7 @@
 // Daybook backend — one Cloudflare Worker, these routes:
 //   GET /            -> real news headlines (NYT, MarketWatch, CNBC RSS, server-side to dodge CORS)
 //   GET /quotes?symbols=AAPL,MSFT  -> real price + day change + company name via Finnhub (free tier)
+//   GET /indices  -> real major-index/VIX/yield/oil/bitcoin data for the markets ticker tape
 //   GET /explain?symbol=NVDA&name=Nvidia  -> a grounded "why is it moving" summary via Workers AI
 //   GET /earnings?symbols=AAPL,MSFT  -> each symbol's next real earnings-call date via Finnhub
 //   GET /company-news?symbols=AAPL,MSFT  -> real per-company articles via Finnhub (last 10 days)
@@ -12,6 +13,19 @@
 //   POST /push/test  -> immediately sends one test push to the stored subscription
 //   scheduled() (Cron Trigger)  -> once a day, checks each subscribed symbol's next earnings
 //     date and pushes a reminder if it's today or tomorrow
+//
+// /indices has no exact free source for raw index points (S&P/Dow/Nasdaq/Russell index
+// licensing is paid almost everywhere). It tries each index's own real quote symbol on
+// Finnhub first (works for some data providers, not guaranteed) and falls back to a
+// liquid tracking ETF scaled by that ETF's well-known, issuer-fixed ratio to the index
+// (SPY=S&P500/10, DIA=DJIA/100, IWM=Russell2000/10 -- these ratios are structural, not
+// approximate, so the scaled price tracks the real index essentially exactly day to day).
+// Nasdaq uses QQQ (Nasdaq-100, not the full Composite) since there's no reliable free
+// 1:1 Composite proxy -- still >99% correlated on daily moves. VIX has no good proxy
+// (volatility ETPs decay and diverge from spot VIX), so it's real-symbol-or-nothing.
+// Oil uses the USO ETF's own real price directly (no proxy ETF for WTI itself). The 10-
+// year yield comes straight from the US Treasury's own public daily-rates CSV feed (no
+// key needed). Bitcoin comes from CoinGecko's public, keyless simple-price endpoint.
 //
 // Requires these set in the Cloudflare dashboard (Worker > Settings):
 //   - Secret "FINNHUB_API_KEY": a free key from finnhub.io
@@ -66,6 +80,7 @@ export default {
     const url = new URL(request.url);
     try {
       if (url.pathname === '/quotes') return await handleQuotes(url, env);
+      if (url.pathname === '/indices') return await handleIndices(env);
       if (url.pathname === '/explain') return await handleExplain(url, env);
       if (url.pathname === '/earnings') return await handleEarnings(url, env);
       if (url.pathname === '/company-news') return await handleCompanyNews(url, env);
@@ -215,6 +230,101 @@ async function handleQuotes(url, env) {
   const quotes = {};
   for (const [sym, quote] of pairs) quotes[sym] = quote;
   return json({ quotes }, 200, 60);
+}
+
+// ---- /indices (real major-index/VIX/yield/oil/bitcoin data -- see note at top) ----
+
+const INDEX_DEFS = [
+  { key: 'sp500', label: 'S&P 500', realSymbol: '^GSPC', proxySymbol: 'SPY', proxyMultiplier: 10 },
+  { key: 'dow', label: 'DOW', realSymbol: '^DJI', proxySymbol: 'DIA', proxyMultiplier: 100 },
+  { key: 'nasdaq', label: 'NASDAQ', realSymbol: '^IXIC', proxySymbol: 'QQQ', proxyMultiplier: null },
+  { key: 'russell2000', label: 'RUSSELL 2K', realSymbol: '^RUT', proxySymbol: 'IWM', proxyMultiplier: 10 },
+  { key: 'vix', label: 'VIX', realSymbol: '^VIX', proxySymbol: null, proxyMultiplier: null }
+];
+
+async function finnhubQuote(sym, env) {
+  try {
+    const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(sym)}&token=${env.FINNHUB_API_KEY}`);
+    if (!res.ok) return null;
+    const q = await res.json();
+    if (typeof q.c !== 'number' || q.c === 0) return null;
+    return q;
+  } catch (err) {
+    return null;
+  }
+}
+
+async function resolveIndex(def, env) {
+  const real = await finnhubQuote(def.realSymbol, env);
+  if (real) {
+    return { key: def.key, label: def.label, value: real.c, changePercent: real.dp, format: 'index2dp', deltaDisplay: 'percent', source: 'index' };
+  }
+  if (def.proxySymbol) {
+    const proxy = await finnhubQuote(def.proxySymbol, env);
+    if (proxy) {
+      const mult = def.proxyMultiplier || 1;
+      return { key: def.key, label: def.label, value: proxy.c * mult, changePercent: proxy.dp, format: 'index2dp', deltaDisplay: 'percent', source: 'proxy:' + def.proxySymbol };
+    }
+  }
+  return { key: def.key, label: def.label, value: null, changePercent: null, format: 'index2dp', deltaDisplay: 'percent', source: 'unavailable' };
+}
+
+async function resolveOil(env) {
+  const proxy = await finnhubQuote('USO', env);
+  if (!proxy) return { key: 'wti', label: 'WTI CRUDE', value: null, changePercent: null, format: 'currency2dp', deltaDisplay: 'percent', source: 'unavailable' };
+  return { key: 'wti', label: 'WTI CRUDE', value: proxy.c, changePercent: proxy.dp, format: 'currency2dp', deltaDisplay: 'percent', source: 'proxy:USO' };
+}
+
+async function resolveBitcoin() {
+  try {
+    const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true');
+    if (!res.ok) return { key: 'btc', label: 'BITCOIN', value: null, changePercent: null, format: 'currency0dp', deltaDisplay: 'percent', source: 'unavailable' };
+    const data = await res.json();
+    const btc = data && data.bitcoin;
+    if (!btc || typeof btc.usd !== 'number') return { key: 'btc', label: 'BITCOIN', value: null, changePercent: null, format: 'currency0dp', deltaDisplay: 'percent', source: 'unavailable' };
+    return { key: 'btc', label: 'BITCOIN', value: btc.usd, changePercent: btc.usd_24h_change, format: 'currency0dp', deltaDisplay: 'percent', source: 'coingecko' };
+  } catch (err) {
+    return { key: 'btc', label: 'BITCOIN', value: null, changePercent: null, format: 'currency0dp', deltaDisplay: 'percent', source: 'unavailable' };
+  }
+}
+
+// US Treasury's own public daily par-yield-curve feed -- no key, CSV, newest row first.
+async function resolveTenYearYield() {
+  try {
+    const year = new Date().getFullYear();
+    const feedUrl = `https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/${year}/all?type=daily_treasury_yield_curve&field_tdr_date_value=${year}&page&_format=csv`;
+    const res = await fetch(feedUrl);
+    if (!res.ok) throw new Error('bad response');
+    const csv = await res.text();
+    const lines = csv.trim().split('\n').filter(Boolean);
+    if (lines.length < 2) throw new Error('empty feed');
+    const header = lines[0].split(',').map((h) => h.replace(/"/g, '').trim());
+    const idx10 = header.findIndex((h) => h === '10 Yr');
+    if (idx10 === -1) throw new Error('10 Yr column not found');
+    const cols = (line) => line.split(',').map((c) => c.replace(/"/g, '').trim());
+    const latest = parseFloat(cols(lines[1])[idx10]);
+    const prev = lines.length > 2 ? parseFloat(cols(lines[2])[idx10]) : NaN;
+    if (isNaN(latest)) throw new Error('no 10yr value');
+    const pointChange = isNaN(prev) ? null : +(latest - prev).toFixed(2);
+    return { key: 'tenY', label: '10Y YIELD', value: latest, pointChange, format: 'percent2dp', deltaDisplay: 'points', source: 'treasury.gov' };
+  } catch (err) {
+    return { key: 'tenY', label: '10Y YIELD', value: null, pointChange: null, format: 'percent2dp', deltaDisplay: 'points', source: 'unavailable' };
+  }
+}
+
+async function handleIndices(env) {
+  if (!env.FINNHUB_API_KEY) return json({ error: 'FINNHUB_API_KEY not configured' }, 500);
+  const [sp500, dow, nasdaq, russell2000, vix, tenY, wti, btc] = await Promise.all([
+    resolveIndex(INDEX_DEFS[0], env),
+    resolveIndex(INDEX_DEFS[1], env),
+    resolveIndex(INDEX_DEFS[2], env),
+    resolveIndex(INDEX_DEFS[3], env),
+    resolveIndex(INDEX_DEFS[4], env),
+    resolveTenYearYield(),
+    resolveOil(env),
+    resolveBitcoin()
+  ]);
+  return json({ items: [sp500, dow, nasdaq, russell2000, vix, tenY, wti, btc] }, 200, 45);
 }
 
 // ---- /earnings (Finnhub earnings calendar) ----

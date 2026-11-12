@@ -23,13 +23,83 @@ function collectWatchlistSymbols(){
   return collectSymbolsFrom('#watchlistList [data-sym]');
 }
 
+var PANEL_ORDER = ['markets', 'portfolio', 'watchlist', 'manage', 'calendar'];
+var currentPanelName = 'markets';
+var prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function triggerTabPillAnim(tabEl){
+  var wrap = tabEl.querySelector('.tab-icon-wrap');
+  if(!wrap) return;
+  wrap.classList.remove('pill-anim');
+  void wrap.offsetWidth; // force reflow so the animation restarts on repeat taps
+  wrap.classList.add('pill-anim');
+}
+
+// Slides the outgoing panel out while the incoming one slides in from the matching side,
+// mirroring iOS's paging transitions -- direction follows each panel's position in
+// PANEL_ORDER rather than always sliding one way.
+function animatePanelSlide(fromPanel, toPanel, forward){
+  if(!fromPanel || fromPanel === toPanel || prefersReducedMotion){
+    document.querySelectorAll('.panel').forEach(function(p){ p.hidden = p !== toPanel; });
+    return;
+  }
+  var dir = forward ? 1 : -1;
+  toPanel.hidden = false;
+  toPanel.style.transition = 'none';
+  toPanel.style.transform = 'translateX(' + (100 * dir) + '%)';
+  fromPanel.style.transition = 'none';
+  fromPanel.style.transform = 'translateX(0)';
+  void toPanel.offsetWidth; // force reflow before enabling the transition
+  toPanel.style.transition = 'transform .32s cubic-bezier(.25,.8,.35,1)';
+  fromPanel.style.transition = 'transform .32s cubic-bezier(.25,.8,.35,1)';
+  toPanel.style.transform = 'translateX(0)';
+  fromPanel.style.transform = 'translateX(' + (-100 * dir) + '%)';
+  var finished = false;
+  function finish(){
+    if(finished) return;
+    finished = true;
+    fromPanel.hidden = true;
+    fromPanel.style.transition = '';
+    fromPanel.style.transform = '';
+    toPanel.style.transition = '';
+    toPanel.style.transform = '';
+    toPanel.removeEventListener('transitionend', finish);
+  }
+  toPanel.addEventListener('transitionend', finish);
+  setTimeout(finish, 420); // safety net in case transitionend never fires
+}
+
 function switchTab(name){
-  document.querySelectorAll('.panel').forEach(function(p){ p.hidden = p.id !== 'panel-' + name; });
-  document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab === name); });
+  var toPanel = document.getElementById('panel-' + name);
+  if(!toPanel) return;
+  if(name !== currentPanelName){
+    var fromPanel = document.getElementById('panel-' + currentPanelName);
+    var forward = PANEL_ORDER.indexOf(name) > PANEL_ORDER.indexOf(currentPanelName);
+    animatePanelSlide(fromPanel, toPanel, forward);
+    currentPanelName = name;
+  }
+  document.querySelectorAll('.tab').forEach(function(t){
+    var isActive = t.dataset.tab === name;
+    t.classList.toggle('active', isActive);
+    if(isActive) triggerTabPillAnim(t);
+  });
 }
 document.querySelectorAll('.tab').forEach(function(t){
   t.addEventListener('click', function(){ switchTab(t.dataset.tab); });
 });
+
+// Collapses the masthead up as the active panel scrolls down, like an iOS large-title bar.
+function initMastheadCollapse(){
+  var masthead = document.querySelector('.masthead');
+  if(!masthead) return;
+  function handleScroll(e){
+    masthead.classList.toggle('collapsed', e.currentTarget.scrollTop > 12);
+  }
+  document.querySelectorAll('.panel').forEach(function(p){
+    p.addEventListener('scroll', handleScroll, { passive: true });
+  });
+}
+initMastheadCollapse();
 
 function updateDate(){
   try{
@@ -618,6 +688,66 @@ function syncAllTickerTapes(){
 }
 
 syncAllTickerTapes();
+
+// ---- Real major-index data for the Markets tab's top ticker tape (see /indices on the
+// Worker for how each value is sourced -- real index symbol where available, otherwise a
+// tracking ETF scaled by its fixed, issuer-defined ratio to the index). Last-good values are
+// cached in localStorage so a reload shows real (if slightly stale) numbers immediately
+// instead of the hardcoded placeholder ever reappearing. ----
+var MARKET_INDICES_KEY = 'daybook_market_indices_v1';
+
+function formatIndexValue(item){
+  if(item.value === null || item.value === undefined || isNaN(item.value)) return '—';
+  if(item.format === 'currency0dp') return '$' + Math.round(item.value).toLocaleString();
+  if(item.format === 'currency2dp') return '$' + item.value.toLocaleString(undefined, { minimumFractionDigits:2, maximumFractionDigits:2 });
+  if(item.format === 'percent2dp') return item.value.toFixed(2) + '%';
+  return item.value.toLocaleString(undefined, { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+
+function formatIndexDelta(item){
+  if(item.deltaDisplay === 'points'){
+    var pc = item.pointChange;
+    if(pc === null || pc === undefined || isNaN(pc)) return { text:'—', up:true };
+    return { text:(pc >= 0 ? '▲' : '▼') + Math.abs(pc).toFixed(2), up: pc >= 0 };
+  }
+  var pct = item.changePercent;
+  if(pct === null || pct === undefined || isNaN(pct)) return { text:'—', up:true };
+  return { text:(pct >= 0 ? '▲' : '▼') + Math.abs(pct).toFixed(1) + '%', up: pct >= 0 };
+}
+
+function renderMarketIndices(items){
+  var track = document.getElementById('marketIndicesTrack');
+  if(!track || !items || !items.length) return;
+  var html = '';
+  items.forEach(function(item){
+    var delta = formatIndexDelta(item);
+    html += '<span class="tick"><b>' + item.label + '</b> ' + formatIndexValue(item) +
+      ' <i class="' + (delta.up ? 'up' : 'down') + '">' + delta.text + '</i></span>';
+  });
+  track.innerHTML = html + html; // doubled for the seamless scroll loop
+}
+
+function hydrateMarketIndicesFromStorage(){
+  try{
+    var raw = localStorage.getItem(MARKET_INDICES_KEY);
+    if(raw) renderMarketIndices(JSON.parse(raw));
+  }catch(e){}
+}
+
+function loadMarketIndices(){
+  fetch(NEWS_API + 'indices')
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      if(!data || !Array.isArray(data.items)) return;
+      renderMarketIndices(data.items);
+      try{ localStorage.setItem(MARKET_INDICES_KEY, JSON.stringify(data.items)); }catch(e){}
+    })
+    .catch(function(){ /* leave whatever's already showing in place */ });
+}
+
+hydrateMarketIndicesFromStorage();
+loadMarketIndices();
+setInterval(loadMarketIndices, 60000);
 
 // ---- Real quotes, fetched from the same Worker (Finnhub under the hood) ----
 function fetchQuote(sym){
