@@ -205,15 +205,17 @@
         <span class="edit-header-title" id="editHeaderTitle">Edit Position</span>
         <button class="edit-save" id="editSaveBtn" onclick="saveEditOverlay()">Save</button>
       </div>
-      <div class="edit-ticker-row">
-        <span class="edit-sym" id="editSym">AAPL</span>
-        <span class="edit-name" id="editName">Apple Inc.</span>
+      <div class="edit-glass-card edit-hero-card">
+        <div class="edit-ticker-row">
+          <span class="edit-sym" id="editSym">AAPL</span>
+          <span class="edit-name" id="editName">Apple Inc.</span>
+        </div>
+        <div class="edit-price-row">
+          <span class="edit-price" id="editPrice">$227.41</span>
+          <span class="edit-chg up" id="editChg">+0.8%</span>
+        </div>
       </div>
-      <div class="edit-price-row">
-        <span class="edit-price" id="editPrice">$227.41</span>
-        <span class="edit-chg up" id="editChg">+0.8%</span>
-      </div>
-      <div class="edit-chart">
+      <div class="edit-glass-card edit-chart">
         <div class="chart-tabs" id="chartTabs">
           <button type="button" class="chart-tab active" data-range="1D">1D</button>
           <button type="button" class="chart-tab" data-range="5D">5D</button>
@@ -234,12 +236,12 @@
           <div class="chart-x-axis" id="chartXAxis"></div>
         </div>
       </div>
-      <div class="edit-explain">
+      <div class="edit-glass-card edit-explain">
         <p class="edit-explain-label">Today's Move</p>
         <p class="edit-explain-text" id="editExplainText">Loading…</p>
         <ul class="edit-explain-sources" id="editExplainSources"></ul>
       </div>
-      <div class="edit-research">
+      <div class="edit-glass-card edit-research">
         <p class="edit-explain-label">My Research</p>
         <textarea class="research-textarea" id="researchNotesInput" rows="5" placeholder="Add your own notes on this company — thesis, risks, anything you want to remember."></textarea>
         <div class="research-actions">
@@ -247,7 +249,7 @@
           <span class="research-saved-hint" id="researchSavedHint" hidden>Saved</span>
         </div>
       </div>
-      <div class="edit-fields" id="editFieldsWrap">
+      <div class="edit-glass-card edit-fields" id="editFieldsWrap">
         <label class="edit-field">
           <span>Shares</span>
           <input type="number" id="editSharesInput" min="0" step="any">

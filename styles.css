@@ -199,56 +199,70 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 .tab-icon-pill.pill-anim{ animation:tabPillIn .42s cubic-bezier(.25,.8,.35,1) forwards; }
 @media (prefers-reduced-motion:reduce){ .tab-icon-pill.pill-anim{ animation:none !important; } }
 
-/* ---- full-page position editor/summary -- a darker shade of the app's own navy
-   (--app-navy-deep), not the unrelated near-black used by the ticker tapes ---- */
+/* ---- full-page position editor/summary -- Liquid Glass: a blurred, brand-colored
+   backdrop (navy/crimson/amber, not a neutral gray) with frosted translucent cards
+   floating over it, mirroring Apple's current Liquid Glass material language while
+   keeping the app's own palette instead of borrowing its colors too. ---- */
 .edit-overlay[hidden]{ display:none; }
 .edit-overlay{ position:fixed; inset:0; z-index:50; background:var(--app-navy-deep); color:var(--terminal-fg);
   display:flex; flex-direction:column; overflow-y:auto; -webkit-overflow-scrolling:touch;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
   padding-left:env(safe-area-inset-left,0px); padding-right:env(safe-area-inset-right,0px); }
+.edit-overlay::before{ content:''; position:fixed; inset:0; z-index:-1;
+  background:
+    radial-gradient(circle at 15% 12%, rgba(156,43,43,.4) 0%, transparent 42%),
+    radial-gradient(circle at 88% 18%, rgba(234,179,8,.28) 0%, transparent 46%),
+    radial-gradient(circle at 30% 95%, rgba(28,63,110,.65) 0%, transparent 50%),
+    var(--app-navy-deep);
+  filter:blur(60px); }
+
+.edit-glass-card{ margin:0 18px 14px; border-radius:20px; padding:16px 18px;
+  background:rgba(255,255,255,.09); -webkit-backdrop-filter:blur(22px) saturate(160%); backdrop-filter:blur(22px) saturate(160%);
+  border:1px solid rgba(255,255,255,.16); border-top-color:rgba(255,255,255,.4);
+  box-shadow:0 10px 26px rgba(0,0,0,.3); }
+
 .edit-header{ flex:none; position:sticky; top:0; z-index:2; display:flex; align-items:center; justify-content:space-between; padding:14px 18px;
-  background:var(--app-navy-deep); border-bottom:1px solid rgba(255,255,255,.12); }
+  background:rgba(8,20,38,.55); -webkit-backdrop-filter:blur(20px) saturate(160%); backdrop-filter:blur(20px) saturate(160%);
+  border-bottom:1px solid rgba(255,255,255,.14); }
 .edit-header-title{ font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
   font-size:13px; color:var(--terminal-fg); }
 .edit-cancel, .edit-save{ background:none; border:none; font-size:14px; font-weight:700; padding:4px; font-family:'IBM Plex Sans',sans-serif; }
 .edit-cancel{ color:var(--terminal-fg); opacity:.65; }
 .edit-save{ color:var(--terminal-amber); }
-.edit-ticker-row{ flex:none; display:flex; align-items:baseline; gap:10px; padding:22px 18px 4px; }
+.edit-hero-card{ margin-top:16px; }
+.edit-ticker-row{ flex:none; display:flex; align-items:baseline; gap:10px; }
 .edit-sym{ font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:36px; color:#fff; letter-spacing:.02em; }
 .edit-name{ font-size:13px; color:rgba(231,233,238,.6); }
-.edit-price-row{ flex:none; display:flex; align-items:baseline; gap:10px; padding:0 18px 22px; font-variant-numeric:tabular-nums; }
+.edit-price-row{ flex:none; display:flex; align-items:baseline; gap:10px; margin-top:4px; font-variant-numeric:tabular-nums; }
 .edit-price{ font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:22px; color:var(--terminal-amber); }
 .edit-chg{ font-weight:700; font-size:15px; }
 .edit-chg.up{ color:#3ad17a; } .edit-chg.down{ color:#ff5f5f; }
-.edit-explain{ flex:none; padding:4px 18px 18px; border-top:1px solid rgba(255,255,255,.1); }
 .edit-explain-label{ font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:rgba(231,233,238,.55);
-  font-weight:700; margin:14px 0 8px; }
+  font-weight:700; margin:0 0 8px; }
 .edit-explain-text{ font-size:13.5px; line-height:1.5; color:var(--terminal-fg); margin:0 0 8px; }
 .edit-explain-sources{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; }
 .edit-explain-sources li a{ font-size:11.5px; color:var(--terminal-amber); text-decoration:none; }
 .edit-explain-sources li a:hover{ text-decoration:underline; }
-.edit-fields{ flex:none; padding:8px 18px 8px; display:flex; flex-direction:column; gap:18px;
-  border-top:1px solid rgba(255,255,255,.1); }
+.edit-fields{ display:flex; flex-direction:column; gap:16px; }
 .edit-field{ display:flex; flex-direction:column; gap:6px; }
 .edit-field span{ font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:rgba(231,233,238,.55); font-weight:700; }
-.edit-field input, .edit-field select{ background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.22); border-radius:8px;
+.edit-field input, .edit-field select{ background:rgba(0,0,0,.18); border:1px solid rgba(255,255,255,.2); border-radius:10px;
   color:#fff; font-size:16px; padding:11px 12px; font-variant-numeric:tabular-nums; font-family:'IBM Plex Sans',sans-serif; }
-.edit-value-readout{ margin:0; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.14); border-radius:8px;
+.edit-value-readout{ margin:0; background:rgba(0,0,0,.14); border:1px solid rgba(255,255,255,.14); border-radius:10px;
   color:rgba(255,255,255,.85); font-size:16px; padding:11px 12px; font-variant-numeric:tabular-nums; font-family:'IBM Plex Sans',sans-serif; }
-.edit-remove{ flex:none; margin:8px 18px 24px; padding:13px 0; border-radius:8px; border:1px solid var(--app-down);
-  background:none; color:#ff6f6f; font-weight:700; font-size:13px; }
+.edit-remove{ flex:none; margin:8px 18px 24px; padding:13px 0; border-radius:14px; border:1px solid var(--app-down);
+  background:rgba(179,39,30,.12); -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); color:#ff6f6f; font-weight:700; font-size:13px; }
 
-.edit-chart{ flex:none; padding:4px 18px 18px; border-top:1px solid rgba(255,255,255,.1); }
-.chart-tabs{ display:flex; gap:4px; margin:14px 0 12px; }
-.chart-tab{ flex:1; padding:6px 0; border-radius:6px; border:1px solid rgba(255,255,255,.18); background:none;
+.chart-tabs{ display:flex; gap:4px; margin-bottom:12px; }
+.chart-tab{ flex:1; padding:6px 0; border-radius:9px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.05);
   color:rgba(231,233,238,.6); font-size:11px; font-weight:700; font-family:'IBM Plex Sans',sans-serif; letter-spacing:.02em; }
 .chart-tab.active{ background:var(--terminal-amber); border-color:var(--terminal-amber); color:#07210f; }
 .chart-row{ display:flex; gap:8px; }
 .chart-y-axis, .chart-y-axis-spacer{ flex:none; width:42px; }
 .chart-y-axis{ height:120px; display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end;
   padding:2px 0; font-size:10px; color:rgba(231,233,238,.5); font-variant-numeric:tabular-nums; }
-.chart-plot{ position:relative; flex:1; min-width:0; height:120px; border-radius:12px; padding:6px;
-  background:rgba(255,255,255,.035); box-shadow:0 1px 0 rgba(255,255,255,.06) inset, 0 8px 18px rgba(0,0,0,.35); }
+.chart-plot{ position:relative; flex:1; min-width:0; height:120px; border-radius:14px; padding:6px;
+  background:rgba(0,0,0,.16); box-shadow:0 1px 0 rgba(255,255,255,.06) inset; }
 .chart-plot svg{ width:100%; height:100%; display:block; }
 .chart-x-row{ margin-top:4px; }
 .chart-x-axis{ flex:1; min-width:0; display:flex; justify-content:space-between; font-size:10px; color:rgba(231,233,238,.5); }
@@ -256,9 +270,8 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
   margin:0; font-size:12.5px; color:rgba(231,233,238,.55); }
 .chart-loading[hidden]{ display:none; }
 
-.edit-research{ flex:none; padding:4px 18px 18px; border-top:1px solid rgba(255,255,255,.1); }
-.research-textarea{ width:100%; margin-top:14px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.22);
-  border-radius:8px; color:#fff; font-size:13.5px; font-family:'IBM Plex Sans',sans-serif; padding:11px 12px; resize:vertical; }
+.research-textarea{ width:100%; margin-top:14px; background:rgba(0,0,0,.18); border:1px solid rgba(255,255,255,.2);
+  border-radius:10px; color:#fff; font-size:13.5px; font-family:'IBM Plex Sans',sans-serif; padding:11px 12px; resize:vertical; }
 .research-textarea::placeholder{ color:rgba(231,233,238,.4); }
 .research-actions{ display:flex; align-items:center; gap:12px; margin-top:10px; }
 .research-actions .btn{ flex:none; padding:8px 18px; }
