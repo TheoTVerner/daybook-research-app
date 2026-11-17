@@ -216,19 +216,26 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
     var(--app-navy-deep);
   filter:blur(60px); }
 
+/* Shared-element morph: the tapped row and its symbol grow into this overlay and its
+   headline symbol (names assigned dynamically in app.js, never statically in CSS,
+   since only one row is ever mid-transition at a time). Matches the rest of the app's
+   slide/ripple timing instead of the browser's default duration. */
+::view-transition-group(daybook-card), ::view-transition-group(daybook-sym){
+  animation-duration:.42s; animation-timing-function:cubic-bezier(.25,.8,.35,1);
+}
+
 .edit-glass-card{ margin:0 18px 14px; border-radius:20px; padding:16px 18px;
   background:rgba(255,255,255,.09); -webkit-backdrop-filter:blur(22px) saturate(160%); backdrop-filter:blur(22px) saturate(160%);
   border:1px solid rgba(255,255,255,.16); border-top-color:rgba(255,255,255,.4);
   box-shadow:0 10px 26px rgba(0,0,0,.3); }
 
-.edit-header{ flex:none; position:sticky; top:0; z-index:2; display:flex; align-items:center; justify-content:space-between; padding:14px 18px;
+/* Replaces the old Cancel/Title/Save header -- closing now happens by swiping down
+   (setupSheetDismiss() in app.js) or tapping this grabber, same as an iOS sheet. */
+.edit-drag-handle{ flex:none; position:sticky; top:0; z-index:2; width:100%; display:flex; align-items:center; justify-content:center;
+  padding:10px 0; margin:0; border:none; box-sizing:border-box; font:inherit;
   background:rgba(8,20,38,.55); -webkit-backdrop-filter:blur(20px) saturate(160%); backdrop-filter:blur(20px) saturate(160%);
   border-bottom:1px solid rgba(255,255,255,.14); }
-.edit-header-title{ font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
-  font-size:13px; color:var(--terminal-fg); }
-.edit-cancel, .edit-save{ background:none; border:none; font-size:14px; font-weight:700; padding:4px; font-family:'IBM Plex Sans',sans-serif; }
-.edit-cancel{ color:var(--terminal-fg); opacity:.65; }
-.edit-save{ color:var(--terminal-amber); }
+.edit-drag-handle span{ width:36px; height:5px; border-radius:3px; background:rgba(255,255,255,.35); pointer-events:none; }
 .edit-hero-card{ margin-top:16px; }
 .edit-ticker-row{ flex:none; display:flex; align-items:baseline; gap:10px; }
 .edit-sym{ font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:36px; color:#fff; letter-spacing:.02em; }

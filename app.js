@@ -300,15 +300,16 @@ function guessSecurityType(sym){
 }
 var GROUP_LIST_IDS = { stock:'portfolioStocks', etf:'portfolioETFs', fund:'portfolioFunds' };
 
-// Any tap on a portfolio row opens its detail page, not just the pencil button -- delegated
-// on the list containers so it covers both the static demo rows and ones rebuilt later from
-// localStorage or added through the form. The pencil's own onclick leads to the exact same
-// place, so it's excluded here rather than left to fire twice.
-Object.keys(GROUP_LIST_IDS).forEach(function(type){
-  var list = document.getElementById(GROUP_LIST_IDS[type]);
+// Any tap on a portfolio or watchlist row opens its detail page, not just the small
+// edit/chevron button -- delegated on the list containers so it covers both the static
+// demo rows and ones rebuilt later from localStorage or added through the form. The
+// edit-btn's own onclick leads to the exact same place (excluded so it doesn't fire
+// twice); watchlist's remove-btn does something different entirely, so it's excluded too.
+['portfolioStocks', 'portfolioETFs', 'portfolioFunds', 'watchlistList'].forEach(function(id){
+  var list = document.getElementById(id);
   if(!list) return;
   list.addEventListener('click', function(e){
-    if(e.target.closest('.edit-btn')) return;
+    if(e.target.closest('.edit-btn, .remove-btn')) return;
     var li = e.target.closest('li[data-sym]');
     if(!li) return;
     haptic('light');
@@ -343,41 +344,88 @@ function formatPositionValue(value){
   return '$' + value.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
+// Shares and Type save themselves the moment they change -- there's no longer a
+// separate Save step (see removeEditPosition/the dropped header). Only My Research
+// keeps its own explicit Save button, since notes are free text worth confirming.
+function applyEditedFieldsToLi(){
+  if(!currentEditLi) return;
+  var shares = parseFloat(editSharesInputEl.value) || 0;
+  currentEditLi.querySelector('.qty-display').textContent = shares + ' sh';
+  var value = formatPositionValue(computePositionValue(currentEditLi, shares));
+  currentEditLi.querySelector('.val-display').textContent = value;
+  document.getElementById('editValueReadout').textContent = value;
+
+  var newType = editTypeInputEl.value;
+  if(newType !== currentEditLi.dataset.type){
+    currentEditLi.dataset.type = newType;
+    var target = document.getElementById(GROUP_LIST_IDS[newType]);
+    if(target) target.appendChild(currentEditLi);
+  }
+  persistPortfolio();
+  syncAllTickerTapes();
+}
+
 var editSharesInputEl = document.getElementById('editSharesInput');
 if(editSharesInputEl){
-  editSharesInputEl.addEventListener('input', function(){
-    if(!currentEditLi) return;
-    var shares = parseFloat(editSharesInputEl.value) || 0;
-    document.getElementById('editValueReadout').textContent = formatPositionValue(computePositionValue(currentEditLi, shares));
-  });
+  editSharesInputEl.addEventListener('input', applyEditedFieldsToLi);
+}
+var editTypeInputEl = document.getElementById('editTypeInput');
+if(editTypeInputEl){
+  editTypeInputEl.addEventListener('change', function(){ haptic('light'); applyEditedFieldsToLi(); });
+}
+
+// Shared-element morph: the tapped row and its symbol grow into the overlay and its
+// headline symbol. Both sides of a view transition need their own, currently-unique
+// name, so these are assigned to whichever concrete element is involved right before
+// the transition and cleared again right after -- never a static CSS rule on .sym,
+// which would give every row the same name at once.
+var VT_CARD_NAME = 'daybook-card';
+var VT_SYM_NAME = 'daybook-sym';
+
+function withViewTransition(updateFn){
+  if(prefersReducedMotion || !document.startViewTransition){
+    updateFn();
+    return null;
+  }
+  return document.startViewTransition(updateFn);
 }
 
 function openEditOverlayForLi(li){
-  currentEditLi = li;
-  var isWatchlist = !!li.closest('#watchlistList');
+  var symEl = li.querySelector('.sym');
+  li.style.viewTransitionName = VT_CARD_NAME;
+  if(symEl) symEl.style.viewTransitionName = VT_SYM_NAME;
 
-  document.getElementById('editSym').textContent = li.dataset.sym;
-  document.getElementById('editName').textContent = li.dataset.name;
-  document.getElementById('editPrice').textContent = li.querySelector('.price').textContent;
+  withViewTransition(function(){
+    currentEditLi = li;
+    var isWatchlist = !!li.closest('#watchlistList');
 
-  var chgEl = li.querySelector('.chg');
-  var editChg = document.getElementById('editChg');
-  editChg.textContent = chgEl.textContent;
-  editChg.className = 'edit-chg ' + (chgEl.classList.contains('up') ? 'up' : 'down');
+    document.getElementById('editSym').textContent = li.dataset.sym;
+    document.getElementById('editName').textContent = li.dataset.name;
+    document.getElementById('editPrice').textContent = li.querySelector('.price').textContent;
 
-  document.getElementById('editHeaderTitle').textContent = isWatchlist ? 'Stock Detail' : 'Edit Position';
-  document.getElementById('editSaveBtn').hidden = isWatchlist;
-  document.getElementById('editFieldsWrap').hidden = isWatchlist;
-  document.getElementById('editRemoveBtn').textContent = isWatchlist ? 'Remove from Watchlist' : 'Remove from Portfolio';
+    var chgEl = li.querySelector('.chg');
+    var editChg = document.getElementById('editChg');
+    editChg.textContent = chgEl.textContent;
+    editChg.className = 'edit-chg ' + (chgEl.classList.contains('up') ? 'up' : 'down');
 
-  if(!isWatchlist){
-    var currentShares = parseFloat(li.querySelector('.qty-display').textContent) || 0;
-    document.getElementById('editSharesInput').value = currentShares;
-    document.getElementById('editValueReadout').textContent = formatPositionValue(computePositionValue(li, currentShares));
-    document.getElementById('editTypeInput').value = li.dataset.type || 'stock';
-  }
+    document.getElementById('editFieldsWrap').hidden = isWatchlist;
+    document.getElementById('editRemoveBtn').textContent = isWatchlist ? 'Remove from Watchlist' : 'Remove from Portfolio';
 
-  document.getElementById('editOverlay').hidden = false;
+    if(!isWatchlist){
+      var currentShares = parseFloat(li.querySelector('.qty-display').textContent) || 0;
+      document.getElementById('editSharesInput').value = currentShares;
+      document.getElementById('editValueReadout').textContent = formatPositionValue(computePositionValue(li, currentShares));
+      document.getElementById('editTypeInput').value = li.dataset.type || 'stock';
+    }
+
+    document.getElementById('editOverlay').hidden = false;
+
+    li.style.viewTransitionName = '';
+    if(symEl) symEl.style.viewTransitionName = '';
+    document.getElementById('editOverlay').style.viewTransitionName = VT_CARD_NAME;
+    document.getElementById('editSym').style.viewTransitionName = VT_SYM_NAME;
+  });
+
   loadExplain(li.dataset.sym, NAME_HINTS[li.dataset.sym] || li.dataset.name);
   loadResearchNotes(li.dataset.sym);
 
@@ -410,9 +458,66 @@ function loadExplain(sym, name){
 }
 
 function closeEditOverlay(){
-  document.getElementById('editOverlay').hidden = true;
-  currentEditLi = null;
+  var li = currentEditLi;
+  var overlay = document.getElementById('editOverlay');
+  var editSym = document.getElementById('editSym');
+  overlay.style.viewTransitionName = VT_CARD_NAME;
+  editSym.style.viewTransitionName = VT_SYM_NAME;
+
+  withViewTransition(function(){
+    overlay.hidden = true;
+    currentEditLi = null;
+    overlay.style.viewTransitionName = '';
+    editSym.style.viewTransitionName = '';
+    if(li){
+      var symEl = li.querySelector('.sym');
+      li.style.viewTransitionName = VT_CARD_NAME;
+      if(symEl) symEl.style.viewTransitionName = VT_SYM_NAME;
+      // Cleared a couple of frames later, once the transition has its "new" snapshot --
+      // otherwise these would linger as permanent inline styles on an ordinary row.
+      requestAnimationFrame(function(){
+        requestAnimationFrame(function(){
+          li.style.viewTransitionName = '';
+          if(symEl) symEl.style.viewTransitionName = '';
+        });
+      });
+    }
+  });
 }
+
+// Swipe-down-to-dismiss, same shape as the pull-to-refresh gesture elsewhere in this
+// app: only engages when already scrolled to the very top of the sheet, so it never
+// fights with ordinary scrolling through the chart/notes/fields below.
+function setupSheetDismiss(){
+  var overlay = document.getElementById('editOverlay');
+  if(!overlay) return;
+  var startY = 0, dragging = false;
+
+  overlay.addEventListener('touchstart', function(e){
+    dragging = overlay.scrollTop <= 0;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+
+  overlay.addEventListener('touchmove', function(e){
+    if(!dragging) return;
+    var dy = e.touches[0].clientY - startY;
+    if(dy <= 0){ overlay.style.transform = ''; overlay.style.opacity = ''; return; }
+    overlay.style.transform = 'translateY(' + (dy * 0.6) + 'px)';
+    overlay.style.opacity = String(Math.max(.5, 1 - dy / 600));
+  }, { passive: true });
+
+  function endDrag(e){
+    if(!dragging) return;
+    dragging = false;
+    var dy = (e.changedTouches && e.changedTouches[0].clientY - startY) || 0;
+    overlay.style.transform = '';
+    overlay.style.opacity = '';
+    if(dy > 110) closeEditOverlay(); // the shared-element morph becomes the exit animation
+  }
+  overlay.addEventListener('touchend', endDrag, { passive: true });
+  overlay.addEventListener('touchcancel', endDrag, { passive: true });
+}
+setupSheetDismiss();
 
 // ---- Historical chart (via the Worker's /candles route, Twelve Data under the hood --
 // Finnhub's free tier doesn't include historical candles at all) ----
@@ -559,25 +664,6 @@ function saveResearchNotes(){
   hint.hidden = false;
   clearTimeout(saveResearchNotes._t);
   saveResearchNotes._t = setTimeout(function(){ hint.hidden = true; }, 1800);
-}
-
-function saveEditOverlay(){
-  if(!currentEditLi) return;
-  var shares = parseFloat(document.getElementById('editSharesInput').value) || 0;
-  var newType = document.getElementById('editTypeInput').value;
-
-  currentEditLi.querySelector('.qty-display').textContent = shares + ' sh';
-  currentEditLi.querySelector('.val-display').textContent = formatPositionValue(computePositionValue(currentEditLi, shares));
-
-  if(newType !== currentEditLi.dataset.type){
-    currentEditLi.dataset.type = newType;
-    var target = document.getElementById(GROUP_LIST_IDS[newType]);
-    if(target) target.appendChild(currentEditLi);
-  }
-  persistPortfolio();
-  syncAllTickerTapes();
-  haptic('success');
-  closeEditOverlay();
 }
 
 function removeEditPosition(){

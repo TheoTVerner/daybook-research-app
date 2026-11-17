@@ -200,11 +200,7 @@
 
     <!-- EDIT POSITION (full-page, trading-terminal styled) -->
     <div class="edit-overlay" id="editOverlay" hidden>
-      <div class="edit-header">
-        <button class="edit-cancel" onclick="closeEditOverlay()">Cancel</button>
-        <span class="edit-header-title" id="editHeaderTitle">Edit Position</span>
-        <button class="edit-save" id="editSaveBtn" onclick="saveEditOverlay()">Save</button>
-      </div>
+      <button class="edit-drag-handle" aria-label="Close" onclick="closeEditOverlay()"><span></span></button>
       <div class="edit-glass-card edit-hero-card">
         <div class="edit-ticker-row">
           <span class="edit-sym" id="editSym">AAPL</span>
