@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,900&family=IBM+Plex+Sans:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,900&family=IBM+Plex+Sans:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&family=Yeseva+One&display=swap">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -91,29 +91,29 @@
 
       <p class="group-label">Stocks</p>
       <ul class="holdings-list" id="portfolioStocks">
-        <li data-sym="AAPL" data-name="Apple Inc." data-type="stock"><span class="sym">AAPL</span><span class="name">Apple Inc.</span><span class="qty-display">42 sh</span><span class="price">$227.41</span><span class="chg up">+0.8%</span><span class="val-display">$9,551</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button></li>
-        <li data-sym="MSFT" data-name="Microsoft Corp." data-type="stock"><span class="sym">MSFT</span><span class="name">Microsoft Corp.</span><span class="qty-display">18 sh</span><span class="price">$421.07</span><span class="chg up">+0.4%</span><span class="val-display">$7,579</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button></li>
-        <li data-sym="NVDA" data-name="Nvidia Corp." data-type="stock"><span class="sym">NVDA</span><span class="name">Nvidia Corp.</span><span class="qty-display">30 sh</span><span class="price">$138.56</span><span class="chg up">+2.3%</span><span class="val-display">$4,157</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button></li>
-        <li data-sym="AMZN" data-name="Amazon.com Inc." data-type="stock"><span class="sym">AMZN</span><span class="name">Amazon.com Inc.</span><span class="qty-display">22 sh</span><span class="price">$186.20</span><span class="chg down">-0.3%</span><span class="val-display">$4,096</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button></li>
-        <li data-sym="JPM" data-name="JPMorgan Chase" data-type="stock"><span class="sym">JPM</span><span class="name">JPMorgan Chase</span><span class="qty-display">15 sh</span><span class="price">$231.88</span><span class="chg up">+0.6%</span><span class="val-display">$3,478</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button></li>
+        <li data-sym="AAPL" data-name="Apple Inc." data-type="stock"><span class="sym">AAPL</span><span class="name">Apple Inc.</span><span class="qty-display">42 sh</span><span class="price">$227.41</span><span class="chg up">+0.8%</span><span class="val-display">$9,551</span></li>
+        <li data-sym="MSFT" data-name="Microsoft Corp." data-type="stock"><span class="sym">MSFT</span><span class="name">Microsoft Corp.</span><span class="qty-display">18 sh</span><span class="price">$421.07</span><span class="chg up">+0.4%</span><span class="val-display">$7,579</span></li>
+        <li data-sym="NVDA" data-name="Nvidia Corp." data-type="stock"><span class="sym">NVDA</span><span class="name">Nvidia Corp.</span><span class="qty-display">30 sh</span><span class="price">$138.56</span><span class="chg up">+2.3%</span><span class="val-display">$4,157</span></li>
+        <li data-sym="AMZN" data-name="Amazon.com Inc." data-type="stock"><span class="sym">AMZN</span><span class="name">Amazon.com Inc.</span><span class="qty-display">22 sh</span><span class="price">$186.20</span><span class="chg down">-0.3%</span><span class="val-display">$4,096</span></li>
+        <li data-sym="JPM" data-name="JPMorgan Chase" data-type="stock"><span class="sym">JPM</span><span class="name">JPMorgan Chase</span><span class="qty-display">15 sh</span><span class="price">$231.88</span><span class="chg up">+0.6%</span><span class="val-display">$3,478</span></li>
       </ul>
 
       <p class="group-label">ETFs</p>
       <ul class="holdings-list" id="portfolioETFs">
-        <li data-sym="VOO" data-name="Vanguard S&amp;P 500 ETF" data-type="etf"><span class="sym">VOO</span><span class="name">Vanguard S&amp;P 500 ETF</span><span class="qty-display">10 sh</span><span class="price">$512.30</span><span class="chg up">+0.5%</span><span class="val-display">$5,123</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button></li>
+        <li data-sym="VOO" data-name="Vanguard S&amp;P 500 ETF" data-type="etf"><span class="sym">VOO</span><span class="name">Vanguard S&amp;P 500 ETF</span><span class="qty-display">10 sh</span><span class="price">$512.30</span><span class="chg up">+0.5%</span><span class="val-display">$5,123</span></li>
       </ul>
 
       <p class="group-label">Mutual Funds</p>
       <ul class="holdings-list" id="portfolioFunds">
-        <li data-sym="FXAIX" data-name="Fidelity 500 Index Fund" data-type="fund"><span class="sym">FXAIX</span><span class="name">Fidelity 500 Index Fund</span><span class="qty-display">50.2 sh</span><span class="price">$189.44</span><span class="chg up">+0.5%</span><span class="val-display">$9,510</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button></li>
+        <li data-sym="FXAIX" data-name="Fidelity 500 Index Fund" data-type="fund"><span class="sym">FXAIX</span><span class="name">Fidelity 500 Index Fund</span><span class="qty-display">50.2 sh</span><span class="price">$189.44</span><span class="chg up">+0.5%</span><span class="val-display">$9,510</span></li>
       </ul>
 
       <p class="section-label">Watchlist</p>
       <ul class="watch-list" id="watchlistList">
-        <li data-sym="TSLA" data-name="Tesla"><span class="sym">TSLA</span><span class="name">Tesla Inc.</span><span class="price">$248.12</span><span class="chg down">-1.4%</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="View details">›</button><button class="remove-btn" onclick="removeWatchlistRow(this)">✕</button></li>
-        <li data-sym="PLTR" data-name="Palantir"><span class="sym">PLTR</span><span class="name">Palantir Tech.</span><span class="price">$41.77</span><span class="chg up">+3.2%</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="View details">›</button><button class="remove-btn" onclick="removeWatchlistRow(this)">✕</button></li>
-        <li data-sym="COIN" data-name="Coinbase"><span class="sym">COIN</span><span class="name">Coinbase Global</span><span class="price">$198.45</span><span class="chg up">+4.6%</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="View details">›</button><button class="remove-btn" onclick="removeWatchlistRow(this)">✕</button></li>
-        <li data-sym="SOFI" data-name="SoFi"><span class="sym">SOFI</span><span class="name">SoFi Technologies</span><span class="price">$10.92</span><span class="chg up">+1.1%</span><button class="edit-btn" onclick="openEditOverlay(this)" aria-label="View details">›</button><button class="remove-btn" onclick="removeWatchlistRow(this)">✕</button></li>
+        <li data-sym="TSLA" data-name="Tesla"><span class="sym">TSLA</span><span class="name">Tesla Inc.</span><span class="price">$248.12</span><span class="chg down">-1.4%</span><button class="remove-btn" onclick="removeWatchlistRow(this)">✕</button></li>
+        <li data-sym="PLTR" data-name="Palantir"><span class="sym">PLTR</span><span class="name">Palantir Tech.</span><span class="price">$41.77</span><span class="chg up">+3.2%</span><button class="remove-btn" onclick="removeWatchlistRow(this)">✕</button></li>
+        <li data-sym="COIN" data-name="Coinbase"><span class="sym">COIN</span><span class="name">Coinbase Global</span><span class="price">$198.45</span><span class="chg up">+4.6%</span><button class="remove-btn" onclick="removeWatchlistRow(this)">✕</button></li>
+        <li data-sym="SOFI" data-name="SoFi"><span class="sym">SOFI</span><span class="name">SoFi Technologies</span><span class="price">$10.92</span><span class="chg up">+1.1%</span><button class="remove-btn" onclick="removeWatchlistRow(this)">✕</button></li>
       </ul>
 
       <p class="section-label">Add a Symbol</p>

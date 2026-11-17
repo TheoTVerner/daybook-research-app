@@ -300,16 +300,15 @@ function guessSecurityType(sym){
 }
 var GROUP_LIST_IDS = { stock:'portfolioStocks', etf:'portfolioETFs', fund:'portfolioFunds' };
 
-// Any tap on a portfolio or watchlist row opens its detail page, not just the small
-// edit/chevron button -- delegated on the list containers so it covers both the static
-// demo rows and ones rebuilt later from localStorage or added through the form. The
-// edit-btn's own onclick leads to the exact same place (excluded so it doesn't fire
-// twice); watchlist's remove-btn does something different entirely, so it's excluded too.
+// Any tap on a portfolio or watchlist row opens its detail page -- delegated on the
+// list containers so it covers both the static demo rows and ones rebuilt later from
+// localStorage or added through the form. Watchlist's remove-btn does something
+// different entirely (removes the row), so it's excluded here.
 ['portfolioStocks', 'portfolioETFs', 'portfolioFunds', 'watchlistList'].forEach(function(id){
   var list = document.getElementById(id);
   if(!list) return;
   list.addEventListener('click', function(e){
-    if(e.target.closest('.edit-btn, .remove-btn')) return;
+    if(e.target.closest('.remove-btn')) return;
     var li = e.target.closest('li[data-sym]');
     if(!li) return;
     haptic('light');
@@ -318,10 +317,6 @@ var GROUP_LIST_IDS = { stock:'portfolioStocks', etf:'portfolioETFs', fund:'portf
 });
 
 var currentEditLi = null;
-
-function openEditOverlay(btn){
-  openEditOverlayForLi(btn.closest('li'));
-}
 
 function openStockDetailBySymbol(sym){
   var li = document.querySelector(
@@ -741,8 +736,7 @@ function buildPortfolioLi(sym, name, type, priceStr, chgStr, chgClass){
   li.innerHTML = '<span class="sym">' + sym + '</span><span class="name">' + name + '</span>' +
     '<span class="qty-display">1 sh</span><span class="price">' + priceStr + '</span>' +
     '<span class="chg ' + chgClass + '">' + chgStr + '</span>' +
-    '<span class="val-display">' + priceStr + '</span>' +
-    '<button class="edit-btn" onclick="openEditOverlay(this)" aria-label="Edit position">✎</button>';
+    '<span class="val-display">' + priceStr + '</span>';
   return li;
 }
 
@@ -752,7 +746,6 @@ function buildWatchlistLi(sym, name, priceStr, chgStr, chgClass){
   li.dataset.name = name;
   li.innerHTML = '<span class="sym">' + sym + '</span><span class="name">' + name + '</span>' +
     '<span class="price">' + priceStr + '</span><span class="chg ' + chgClass + '">' + chgStr + '</span>' +
-    '<button class="edit-btn" onclick="openEditOverlay(this)" aria-label="View details">›</button>' +
     '<button class="remove-btn" onclick="removeWatchlistRow(this)">✕</button>';
   return li;
 }
