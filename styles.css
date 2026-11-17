@@ -1,5 +1,5 @@
 :root{
-  --app-navy:#0e2340; --app-navy-deep:#081426; --app-body:#ffffff; --app-card:#f4f2ec; --app-ink:#15171c; --app-ink-soft:#585e6a;
+  --app-navy:#0e2340; --app-navy-deep:#081426; --app-body:#F6F1E7; --app-card:#FFFDF8; --app-ink:#15171c; --app-ink-soft:#585e6a;
   --app-rule:#ddd7c8; --app-silver:#c6cdd8; --app-gold:#8a6914; --app-crimson:#9c2b2b; --app-up:#1d7a4c; --app-down:#b3271e;
   --terminal-bg:#070c15; --terminal-fg:#e7e9ee; --terminal-amber:#eab308;
 }
@@ -99,11 +99,13 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .pod-show{ font-size:9.5px; color:var(--app-ink-soft); margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
-.holdings-list, .watch-list{ list-style:none; margin:0; padding:0 18px; }
-.holdings-list li, .watch-list li{ display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid var(--app-rule);
+.holdings-list, .watch-list{ list-style:none; margin:0; padding:2px 18px 4px; display:flex; flex-direction:column; gap:8px; }
+.holdings-list li, .watch-list li{ display:flex; align-items:center; gap:8px; padding:11px 13px; border-radius:14px;
+  background:var(--app-card); border:1px solid var(--app-rule);
+  box-shadow:0 1px 2px rgba(14,35,64,.04), 0 3px 10px rgba(14,35,64,.05);
   font-size:12.5px; font-variant-numeric:tabular-nums; }
-.holdings-list li{ cursor:pointer; margin:0 -18px; padding-left:18px; padding-right:18px; transition:background-color .15s ease; }
-.holdings-list li:active{ background-color:var(--app-card); }
+.holdings-list li{ cursor:pointer; transition:transform .1s ease, box-shadow .15s ease; }
+.holdings-list li:active{ transform:scale(.985); box-shadow:0 1px 2px rgba(14,35,64,.04); }
 .sym{ font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:14px; width:48px; flex:none; color:var(--app-crimson); }
 .name{ flex:1; min-width:0; color:var(--app-ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .qty{ width:44px; flex:none; color:var(--app-ink-soft); text-align:right; }
@@ -163,8 +165,9 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 .cal-day.today{ background:var(--app-crimson); color:#fff; font-weight:700; }
 .cal-dot{ width:4px; height:4px; border-radius:50%; background:var(--app-crimson); }
 .cal-day.today .cal-dot{ background:#fff; }
-.cal-events{ list-style:none; margin:0; padding:0 18px 16px; }
-.cal-events li{ display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid var(--app-rule); font-size:12.5px; }
+.cal-events{ list-style:none; margin:0; padding:2px 18px 16px; display:flex; flex-direction:column; gap:8px; }
+.cal-events li{ display:flex; align-items:center; gap:8px; padding:11px 13px; border-radius:14px; background:var(--app-card);
+  border:1px solid var(--app-rule); box-shadow:0 1px 2px rgba(14,35,64,.04), 0 3px 10px rgba(14,35,64,.05); font-size:12.5px; }
 .cal-date{ width:48px; flex:none; font-family:'Barlow Condensed',sans-serif; font-weight:700; color:var(--app-crimson); font-size:13px; }
 .cal-pill{ flex:none; background:var(--app-crimson); color:#fff; font-family:'Barlow Condensed',sans-serif; font-weight:700;
   font-size:10.5px; padding:2px 7px; border-radius:4px; }
