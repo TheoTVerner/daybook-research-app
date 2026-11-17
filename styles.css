@@ -26,7 +26,7 @@ body{
   border-bottom:3px solid var(--app-crimson); transition:padding .25s ease; }
 .masthead-title{ font-family:'Yeseva One',Georgia,serif; font-weight:400; font-size:24px; margin:0; letter-spacing:.01em;
   transition:font-size .25s ease; }
-.masthead-date{ font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--app-silver); margin:2px 0 0;
+.masthead-date{ font-family:'Yeseva One',Georgia,serif; font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--app-silver); margin:2px 0 0;
   max-height:16px; opacity:1; overflow:hidden; transition:max-height .25s ease, opacity .2s ease, margin .25s ease; }
 .masthead-icon{ position:absolute; top:calc(6.5px + env(safe-area-inset-top,0px)); right:18px;
   width:28px; height:28px; border-radius:8px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2);
@@ -64,10 +64,10 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 .pull-refresh.refreshing .pull-refresh-spinner{ animation:pullRefreshSpin .6s linear infinite; }
 .pull-refresh.ready .pull-refresh-spinner{ border-top-color:var(--app-crimson); border-width:2.5px; }
 @keyframes pullRefreshSpin{ to{ transform:rotate(360deg); } }
-.section-label{ font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--app-ink-soft); font-weight:700;
+.section-label{ font-family:'Yeseva One',Georgia,serif; font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--app-ink-soft); font-weight:400;
   padding:14px 18px 7px; }
 .section-label.first{ padding-top:16px; }
-.group-label{ font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--app-crimson); font-weight:700;
+.group-label{ font-family:'Yeseva One',Georgia,serif; font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--app-crimson); font-weight:400;
   padding:10px 18px 4px; }
 
 .story{ padding:11px 18px; border-bottom:1px solid var(--app-rule); }
@@ -248,8 +248,8 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 .edit-price{ font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:22px; color:var(--app-crimson); }
 .edit-chg{ font-weight:700; font-size:15px; }
 .edit-chg.up{ color:var(--app-up); } .edit-chg.down{ color:var(--app-down); }
-.edit-explain-label{ font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--app-ink-soft);
-  font-weight:700; margin:0 0 8px; }
+.edit-explain-label{ font-family:'Yeseva One',Georgia,serif; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--app-ink-soft);
+  font-weight:400; margin:0 0 8px; }
 .edit-explain-text{ font-size:13.5px; line-height:1.5; color:var(--app-ink); margin:0 0 8px; }
 .edit-explain-sources{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; }
 .edit-explain-sources li a{ font-size:11.5px; color:var(--app-crimson); text-decoration:none; }
