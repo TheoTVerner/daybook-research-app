@@ -374,57 +374,42 @@ if(editTypeInputEl){
   editTypeInputEl.addEventListener('change', function(){ haptic('light'); applyEditedFieldsToLi(); });
 }
 
-// Shared-element morph: the tapped row and its symbol grow into the overlay and its
-// headline symbol. Both sides of a view transition need their own, currently-unique
-// name, so these are assigned to whichever concrete element is involved right before
-// the transition and cleared again right after -- never a static CSS rule on .sym,
-// which would give every row the same name at once.
-var VT_CARD_NAME = 'daybook-card';
-var VT_SYM_NAME = 'daybook-sym';
-
-function withViewTransition(updateFn){
-  if(prefersReducedMotion || !document.startViewTransition){
-    updateFn();
-    return null;
-  }
-  return document.startViewTransition(updateFn);
-}
-
+// Opens with a circular burst from the tapped row's own position -- same clip-path
+// technique as the tab-icon ripple (triggerTabPillAnim), just covering the full
+// overlay instead of one small pill. --burst-x/--burst-y are set from the row's
+// actual on-screen center, so it always bursts from wherever you actually tapped.
 function openEditOverlayForLi(li){
-  var symEl = li.querySelector('.sym');
-  li.style.viewTransitionName = VT_CARD_NAME;
-  if(symEl) symEl.style.viewTransitionName = VT_SYM_NAME;
+  var r = li.getBoundingClientRect();
+  var overlay = document.getElementById('editOverlay');
+  overlay.style.setProperty('--burst-x', (r.left + r.width / 2) + 'px');
+  overlay.style.setProperty('--burst-y', (r.top + r.height / 2) + 'px');
 
-  withViewTransition(function(){
-    currentEditLi = li;
-    var isWatchlist = !!li.closest('#watchlistList');
+  currentEditLi = li;
+  var isWatchlist = !!li.closest('#watchlistList');
 
-    document.getElementById('editSym').textContent = li.dataset.sym;
-    document.getElementById('editName').textContent = li.dataset.name;
-    document.getElementById('editPrice').textContent = li.querySelector('.price').textContent;
+  document.getElementById('editSym').textContent = li.dataset.sym;
+  document.getElementById('editName').textContent = li.dataset.name;
+  document.getElementById('editPrice').textContent = li.querySelector('.price').textContent;
 
-    var chgEl = li.querySelector('.chg');
-    var editChg = document.getElementById('editChg');
-    editChg.textContent = chgEl.textContent;
-    editChg.className = 'edit-chg ' + (chgEl.classList.contains('up') ? 'up' : 'down');
+  var chgEl = li.querySelector('.chg');
+  var editChg = document.getElementById('editChg');
+  editChg.textContent = chgEl.textContent;
+  editChg.className = 'edit-chg ' + (chgEl.classList.contains('up') ? 'up' : 'down');
 
-    document.getElementById('editFieldsWrap').hidden = isWatchlist;
-    document.getElementById('editRemoveBtn').textContent = isWatchlist ? 'Remove from Watchlist' : 'Remove from Portfolio';
+  document.getElementById('editFieldsWrap').hidden = isWatchlist;
+  document.getElementById('editRemoveBtn').textContent = isWatchlist ? 'Remove from Watchlist' : 'Remove from Portfolio';
 
-    if(!isWatchlist){
-      var currentShares = parseFloat(li.querySelector('.qty-display').textContent) || 0;
-      document.getElementById('editSharesInput').value = currentShares;
-      document.getElementById('editValueReadout').textContent = formatPositionValue(computePositionValue(li, currentShares));
-      document.getElementById('editTypeInput').value = li.dataset.type || 'stock';
-    }
+  if(!isWatchlist){
+    var currentShares = parseFloat(li.querySelector('.qty-display').textContent) || 0;
+    document.getElementById('editSharesInput').value = currentShares;
+    document.getElementById('editValueReadout').textContent = formatPositionValue(computePositionValue(li, currentShares));
+    document.getElementById('editTypeInput').value = li.dataset.type || 'stock';
+  }
 
-    document.getElementById('editOverlay').hidden = false;
-
-    li.style.viewTransitionName = '';
-    if(symEl) symEl.style.viewTransitionName = '';
-    document.getElementById('editOverlay').style.viewTransitionName = VT_CARD_NAME;
-    document.getElementById('editSym').style.viewTransitionName = VT_SYM_NAME;
-  });
+  overlay.hidden = false;
+  overlay.classList.remove('bursting-out');
+  void overlay.offsetWidth; // force reflow so the burst restarts if reopened quickly
+  if(!prefersReducedMotion) overlay.classList.add('bursting-in');
 
   loadExplain(li.dataset.sym, NAME_HINTS[li.dataset.sym] || li.dataset.name);
   loadResearchNotes(li.dataset.sym);
@@ -458,31 +443,26 @@ function loadExplain(sym, name){
 }
 
 function closeEditOverlay(){
-  var li = currentEditLi;
   var overlay = document.getElementById('editOverlay');
-  var editSym = document.getElementById('editSym');
-  overlay.style.viewTransitionName = VT_CARD_NAME;
-  editSym.style.viewTransitionName = VT_SYM_NAME;
-
-  withViewTransition(function(){
+  if(prefersReducedMotion){
     overlay.hidden = true;
+    overlay.classList.remove('bursting-in');
     currentEditLi = null;
-    overlay.style.viewTransitionName = '';
-    editSym.style.viewTransitionName = '';
-    if(li){
-      var symEl = li.querySelector('.sym');
-      li.style.viewTransitionName = VT_CARD_NAME;
-      if(symEl) symEl.style.viewTransitionName = VT_SYM_NAME;
-      // Cleared a couple of frames later, once the transition has its "new" snapshot --
-      // otherwise these would linger as permanent inline styles on an ordinary row.
-      requestAnimationFrame(function(){
-        requestAnimationFrame(function(){
-          li.style.viewTransitionName = '';
-          if(symEl) symEl.style.viewTransitionName = '';
-        });
-      });
-    }
-  });
+    return;
+  }
+  overlay.classList.remove('bursting-in');
+  overlay.classList.add('bursting-out');
+  var finished = false;
+  function finish(){
+    if(finished) return;
+    finished = true;
+    overlay.hidden = true;
+    overlay.classList.remove('bursting-out');
+    currentEditLi = null;
+    overlay.removeEventListener('animationend', finish);
+  }
+  overlay.addEventListener('animationend', finish);
+  setTimeout(finish, 420); // safety net in case animationend never fires
 }
 
 // Swipe-down-to-dismiss, same shape as the pull-to-refresh gesture elsewhere in this
@@ -512,7 +492,7 @@ function setupSheetDismiss(){
     var dy = (e.changedTouches && e.changedTouches[0].clientY - startY) || 0;
     overlay.style.transform = '';
     overlay.style.opacity = '';
-    if(dy > 110) closeEditOverlay(); // the shared-element morph becomes the exit animation
+    if(dy > 110) closeEditOverlay(); // the burst-out shrink becomes the exit animation
   }
   overlay.addEventListener('touchend', endDrag, { passive: true });
   overlay.addEventListener('touchcancel', endDrag, { passive: true });
@@ -558,7 +538,7 @@ function drawChart(points, range){
   });
 
   var up = closes[closes.length - 1] >= closes[0];
-  var color = up ? '#3ad17a' : '#ff5f5f';
+  var color = up ? '#1d7a4c' : '#b3271e'; // matches --app-up/--app-down
 
   svg.innerHTML = '';
   svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);

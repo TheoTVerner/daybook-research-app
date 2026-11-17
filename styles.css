@@ -199,87 +199,94 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 .tab-icon-pill.pill-anim{ animation:tabPillIn .42s cubic-bezier(.25,.8,.35,1) forwards; }
 @media (prefers-reduced-motion:reduce){ .tab-icon-pill.pill-anim{ animation:none !important; } }
 
-/* ---- full-page position editor/summary -- Liquid Glass: a blurred, brand-colored
-   backdrop (navy/crimson/amber, not a neutral gray) with frosted translucent cards
-   floating over it, mirroring Apple's current Liquid Glass material language while
-   keeping the app's own palette instead of borrowing its colors too. ---- */
+/* ---- full-page position editor/summary -- Liquid Glass, inverted to the app's own
+   BRIGHT palette (cream/crimson/navy/gold) instead of the dark "trading terminal"
+   look it had before: light frosted cards over a blurred, colorful, sunlit backdrop,
+   matching the rest of the app instead of being the one dark screen in it. ---- */
 .edit-overlay[hidden]{ display:none; }
-.edit-overlay{ position:fixed; inset:0; z-index:50; background:var(--app-navy-deep); color:var(--terminal-fg);
+.edit-overlay{ position:fixed; inset:0; z-index:50; background:var(--app-body); color:var(--app-ink);
   display:flex; flex-direction:column; overflow-y:auto; -webkit-overflow-scrolling:touch;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
   padding-left:env(safe-area-inset-left,0px); padding-right:env(safe-area-inset-right,0px); }
 .edit-overlay::before{ content:''; position:fixed; inset:0; z-index:-1;
   background:
-    radial-gradient(circle at 15% 12%, rgba(156,43,43,.4) 0%, transparent 42%),
-    radial-gradient(circle at 88% 18%, rgba(234,179,8,.28) 0%, transparent 46%),
-    radial-gradient(circle at 30% 95%, rgba(28,63,110,.65) 0%, transparent 50%),
-    var(--app-navy-deep);
+    radial-gradient(circle at 15% 12%, rgba(156,43,43,.3) 0%, transparent 42%),
+    radial-gradient(circle at 88% 18%, rgba(234,179,8,.32) 0%, transparent 46%),
+    radial-gradient(circle at 30% 95%, rgba(14,35,64,.26) 0%, transparent 50%),
+    var(--app-body);
   filter:blur(60px); }
 
-/* Shared-element morph: the tapped row and its symbol grow into this overlay and its
-   headline symbol (names assigned dynamically in app.js, never statically in CSS,
-   since only one row is ever mid-transition at a time). Matches the rest of the app's
-   slide/ripple timing instead of the browser's default duration. */
-::view-transition-group(daybook-card), ::view-transition-group(daybook-sym){
-  animation-duration:.42s; animation-timing-function:cubic-bezier(.25,.8,.35,1);
+/* Bursts open from the exact point that was tapped (--burst-x/--burst-y, set per
+   row in openEditOverlayForLi) -- same clip-path-circle technique as the tab-icon
+   ripple, just covering the whole sheet instead of one small pill. */
+@keyframes editBurstIn{
+  from{ clip-path:circle(0px at var(--burst-x,50%) var(--burst-y,50%)); }
+  to{ clip-path:circle(farthest-corner at var(--burst-x,50%) var(--burst-y,50%)); }
 }
+@keyframes editBurstOut{
+  from{ clip-path:circle(farthest-corner at var(--burst-x,50%) var(--burst-y,50%)); }
+  to{ clip-path:circle(0px at var(--burst-x,50%) var(--burst-y,50%)); }
+}
+.edit-overlay.bursting-in{ animation:editBurstIn .42s cubic-bezier(.25,.8,.35,1) forwards; }
+.edit-overlay.bursting-out{ animation:editBurstOut .34s cubic-bezier(.4,0,.2,1) forwards; }
+@media (prefers-reduced-motion:reduce){ .edit-overlay.bursting-in, .edit-overlay.bursting-out{ animation:none !important; } }
 
 .edit-glass-card{ margin:0 18px 14px; border-radius:20px; padding:16px 18px;
-  background:rgba(255,255,255,.09); -webkit-backdrop-filter:blur(22px) saturate(160%); backdrop-filter:blur(22px) saturate(160%);
-  border:1px solid rgba(255,255,255,.16); border-top-color:rgba(255,255,255,.4);
-  box-shadow:0 10px 26px rgba(0,0,0,.3); }
+  background:rgba(255,255,255,.55); -webkit-backdrop-filter:blur(22px) saturate(160%); backdrop-filter:blur(22px) saturate(160%);
+  border:1px solid rgba(255,255,255,.7); border-top-color:rgba(255,255,255,.9);
+  box-shadow:0 1px 2px rgba(14,35,64,.06), 0 10px 26px rgba(14,35,64,.12); }
 
 /* Replaces the old Cancel/Title/Save header -- closing now happens by swiping down
    (setupSheetDismiss() in app.js) or tapping this grabber, same as an iOS sheet. */
 .edit-drag-handle{ flex:none; position:sticky; top:0; z-index:2; width:100%; display:flex; align-items:center; justify-content:center;
   padding:10px 0; margin:0; border:none; box-sizing:border-box; font:inherit;
-  background:rgba(8,20,38,.55); -webkit-backdrop-filter:blur(20px) saturate(160%); backdrop-filter:blur(20px) saturate(160%);
-  border-bottom:1px solid rgba(255,255,255,.14); }
-.edit-drag-handle span{ width:36px; height:5px; border-radius:3px; background:rgba(255,255,255,.35); pointer-events:none; }
+  background:rgba(255,255,255,.5); -webkit-backdrop-filter:blur(20px) saturate(160%); backdrop-filter:blur(20px) saturate(160%);
+  border-bottom:1px solid rgba(14,35,64,.08); }
+.edit-drag-handle span{ width:36px; height:5px; border-radius:3px; background:rgba(14,35,64,.25); pointer-events:none; }
 .edit-hero-card{ margin-top:16px; }
 .edit-ticker-row{ flex:none; display:flex; align-items:baseline; gap:10px; }
-.edit-sym{ font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:36px; color:#fff; letter-spacing:.02em; }
-.edit-name{ font-size:13px; color:rgba(231,233,238,.6); }
+.edit-sym{ font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:36px; color:var(--app-ink); letter-spacing:.02em; }
+.edit-name{ font-size:13px; color:var(--app-ink-soft); }
 .edit-price-row{ flex:none; display:flex; align-items:baseline; gap:10px; margin-top:4px; font-variant-numeric:tabular-nums; }
-.edit-price{ font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:22px; color:var(--terminal-amber); }
+.edit-price{ font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:22px; color:var(--app-crimson); }
 .edit-chg{ font-weight:700; font-size:15px; }
-.edit-chg.up{ color:#3ad17a; } .edit-chg.down{ color:#ff5f5f; }
-.edit-explain-label{ font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:rgba(231,233,238,.55);
+.edit-chg.up{ color:var(--app-up); } .edit-chg.down{ color:var(--app-down); }
+.edit-explain-label{ font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--app-ink-soft);
   font-weight:700; margin:0 0 8px; }
-.edit-explain-text{ font-size:13.5px; line-height:1.5; color:var(--terminal-fg); margin:0 0 8px; }
+.edit-explain-text{ font-size:13.5px; line-height:1.5; color:var(--app-ink); margin:0 0 8px; }
 .edit-explain-sources{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; }
-.edit-explain-sources li a{ font-size:11.5px; color:var(--terminal-amber); text-decoration:none; }
+.edit-explain-sources li a{ font-size:11.5px; color:var(--app-crimson); text-decoration:none; }
 .edit-explain-sources li a:hover{ text-decoration:underline; }
 .edit-fields{ display:flex; flex-direction:column; gap:16px; }
 .edit-field{ display:flex; flex-direction:column; gap:6px; }
-.edit-field span{ font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:rgba(231,233,238,.55); font-weight:700; }
-.edit-field input, .edit-field select{ background:rgba(0,0,0,.18); border:1px solid rgba(255,255,255,.2); border-radius:10px;
-  color:#fff; font-size:16px; padding:11px 12px; font-variant-numeric:tabular-nums; font-family:'IBM Plex Sans',sans-serif; }
-.edit-value-readout{ margin:0; background:rgba(0,0,0,.14); border:1px solid rgba(255,255,255,.14); border-radius:10px;
-  color:rgba(255,255,255,.85); font-size:16px; padding:11px 12px; font-variant-numeric:tabular-nums; font-family:'IBM Plex Sans',sans-serif; }
+.edit-field span{ font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--app-ink-soft); font-weight:700; }
+.edit-field input, .edit-field select{ background:rgba(14,35,64,.06); border:1px solid rgba(14,35,64,.16); border-radius:10px;
+  color:var(--app-ink); font-size:16px; padding:11px 12px; font-variant-numeric:tabular-nums; font-family:'IBM Plex Sans',sans-serif; }
+.edit-value-readout{ margin:0; background:rgba(14,35,64,.04); border:1px solid rgba(14,35,64,.12); border-radius:10px;
+  color:var(--app-ink); font-size:16px; padding:11px 12px; font-variant-numeric:tabular-nums; font-family:'IBM Plex Sans',sans-serif; }
 .edit-remove{ flex:none; margin:8px 18px 24px; padding:13px 0; border-radius:14px; border:1px solid var(--app-down);
-  background:rgba(179,39,30,.12); -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); color:#ff6f6f; font-weight:700; font-size:13px; }
+  background:rgba(179,39,30,.08); -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); color:var(--app-down); font-weight:700; font-size:13px; }
 
 .chart-tabs{ display:flex; gap:4px; margin-bottom:12px; }
-.chart-tab{ flex:1; padding:6px 0; border-radius:9px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.05);
-  color:rgba(231,233,238,.6); font-size:11px; font-weight:700; font-family:'IBM Plex Sans',sans-serif; letter-spacing:.02em; }
-.chart-tab.active{ background:var(--terminal-amber); border-color:var(--terminal-amber); color:#07210f; }
+.chart-tab{ flex:1; padding:6px 0; border-radius:9px; border:1px solid rgba(14,35,64,.16); background:rgba(255,255,255,.45);
+  color:var(--app-ink-soft); font-size:11px; font-weight:700; font-family:'IBM Plex Sans',sans-serif; letter-spacing:.02em; }
+.chart-tab.active{ background:var(--app-crimson); border-color:var(--app-crimson); color:#fff; }
 .chart-row{ display:flex; gap:8px; }
 .chart-y-axis, .chart-y-axis-spacer{ flex:none; width:42px; }
 .chart-y-axis{ height:120px; display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end;
-  padding:2px 0; font-size:10px; color:rgba(231,233,238,.5); font-variant-numeric:tabular-nums; }
+  padding:2px 0; font-size:10px; color:var(--app-ink-soft); font-variant-numeric:tabular-nums; }
 .chart-plot{ position:relative; flex:1; min-width:0; height:120px; border-radius:14px; padding:6px;
-  background:rgba(0,0,0,.16); box-shadow:0 1px 0 rgba(255,255,255,.06) inset; }
+  background:rgba(14,35,64,.05); box-shadow:0 1px 0 rgba(255,255,255,.5) inset; }
 .chart-plot svg{ width:100%; height:100%; display:block; }
 .chart-x-row{ margin-top:4px; }
-.chart-x-axis{ flex:1; min-width:0; display:flex; justify-content:space-between; font-size:10px; color:rgba(231,233,238,.5); }
+.chart-x-axis{ flex:1; min-width:0; display:flex; justify-content:space-between; font-size:10px; color:var(--app-ink-soft); }
 .chart-loading{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-  margin:0; font-size:12.5px; color:rgba(231,233,238,.55); }
+  margin:0; font-size:12.5px; color:var(--app-ink-soft); }
 .chart-loading[hidden]{ display:none; }
 
-.research-textarea{ width:100%; margin-top:14px; background:rgba(0,0,0,.18); border:1px solid rgba(255,255,255,.2);
-  border-radius:10px; color:#fff; font-size:13.5px; font-family:'IBM Plex Sans',sans-serif; padding:11px 12px; resize:vertical; }
-.research-textarea::placeholder{ color:rgba(231,233,238,.4); }
+.research-textarea{ width:100%; margin-top:14px; background:rgba(14,35,64,.06); border:1px solid rgba(14,35,64,.16);
+  border-radius:10px; color:var(--app-ink); font-size:13.5px; font-family:'IBM Plex Sans',sans-serif; padding:11px 12px; resize:vertical; }
+.research-textarea::placeholder{ color:var(--app-ink-soft); opacity:.75; }
 .research-actions{ display:flex; align-items:center; gap:12px; margin-top:10px; }
 .research-actions .btn{ flex:none; padding:8px 18px; }
-.research-saved-hint{ font-size:11.5px; font-weight:700; color:#3ad17a; }
+.research-saved-hint{ font-size:11.5px; font-weight:700; color:var(--app-up); }
