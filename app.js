@@ -646,11 +646,14 @@ function saveResearchNotes(){
 }
 
 // ---- Personal Thesis / Three Catalysts: AI summaries grounded ONLY in the notes above,
-// never public news. Generated once per saved version of a symbol's notes (cached
-// alongside the notes text itself, keyed by symbol) rather than on every overlay open --
-// re-generated only when Save Notes actually changes something. Shows nothing at all
-// when there are no notes, per the user's own request. ----
+// plus real recent company news as supporting context for the catalysts specifically.
+// Cached per symbol (alongside the notes text it was generated from, and a timestamp),
+// re-generated whenever Save Notes changes the text, or whenever the cached copy is
+// more than THESIS_CACHE_MAX_AGE_MS old -- since the news context can move even when
+// the notes themselves haven't. Shows nothing at all when there are no notes, per the
+// user's own request. ----
 var RESEARCH_THESIS_KEY = 'daybook_research_thesis';
+var THESIS_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 function getResearchThesisCache(){
   try{ return JSON.parse(localStorage.getItem(RESEARCH_THESIS_KEY) || '{}'); }catch(e){ return {}; }
@@ -679,6 +682,16 @@ function renderThesisSections(entry){
       list.appendChild(li);
     });
   }
+  var sourcesEl = document.getElementById('catalystsSources');
+  sourcesEl.innerHTML = '';
+  (entry && entry.sources || []).forEach(function(s){
+    var sLi = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = s.link; a.target = '_blank'; a.rel = 'noopener';
+    a.textContent = s.title + ' — ' + s.source;
+    sLi.appendChild(a);
+    sourcesEl.appendChild(sLi);
+  });
 }
 
 function loadThesisForSymbol(sym, name, notes){
@@ -688,7 +701,8 @@ function loadThesisForSymbol(sym, name, notes){
   }
   var cached = getResearchThesisCache()[sym];
   var cachedHasResult = cached && ((cached.thesis && cached.thesis.trim()) || (cached.catalysts && cached.catalysts.length));
-  if(cached && cached.notes === notes && cachedHasResult){
+  var cachedFresh = cached && (Date.now() - (cached.fetchedAt || 0)) < THESIS_CACHE_MAX_AGE_MS;
+  if(cached && cached.notes === notes && cachedHasResult && cachedFresh){
     renderThesisSections(cached);
     return;
   }
@@ -713,7 +727,7 @@ function loadThesisForSymbol(sym, name, notes){
         }
         return;
       }
-      var entry = { notes: notes, thesis: data.thesis || '', catalysts: data.catalysts || [] };
+      var entry = { notes: notes, thesis: data.thesis || '', catalysts: data.catalysts || [], sources: data.sources || [], fetchedAt: Date.now() };
       setResearchThesisCache(sym, entry);
       if(currentEditLi && currentEditLi.dataset.sym === sym) renderThesisSections(entry);
     })

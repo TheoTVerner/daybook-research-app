@@ -3,9 +3,10 @@
 //   GET /quotes?symbols=AAPL,MSFT  -> real price + day change + company name via Finnhub (free tier)
 //   GET /indices  -> real major-index/VIX/yield/oil/bitcoin data for the markets ticker tape
 //   GET /explain?symbol=NVDA&name=Nvidia  -> a grounded "why is it moving" summary via Workers AI
-//   POST /thesis  {symbol, name, notes}  -> a "personal thesis" + three catalysts, generated via
-//     Workers AI grounded ONLY in the user's own saved research notes (never public news/data) --
-//     this is the one endpoint that sends something the user typed, not market data, to the AI
+//   POST /thesis  {symbol, name, notes}  -> a "personal thesis" + three catalysts via Workers AI,
+//     grounded in the user's own saved research notes PLUS real recent Finnhub company news as
+//     supporting context -- this is the one endpoint that sends something the user typed, not
+//     just market data, to the AI
 //   GET /earnings?symbols=AAPL,MSFT  -> each symbol's next real earnings-call date via Finnhub
 //   GET /company-news?symbols=AAPL,MSFT  -> real per-company articles via Finnhub (last 10 days)
 //   GET /candles?symbol=AAPL&range=1D|5D|3M|6M|1Y|ALL  -> historical close prices via Twelve Data
@@ -539,19 +540,29 @@ async function handleThesis(request, env) {
   const notes = (body && body.notes || '').trim();
   if (!symbol || !notes) return json({ error: 'symbol and notes are required' }, 400);
 
+  // Real, current reporting on the company (same Finnhub per-company feed /explain and
+  // /company-news already use) -- supplements the investor's own notes with whatever's
+  // actually happened lately, rather than leaving the model to work from notes alone.
+  const realNews = env.FINNHUB_API_KEY ? (await fetchCompanyNews(symbol, env)).slice(0, 5) : [];
+  const newsBlock = realNews.length
+    ? 'Recent real news headlines about ' + (name || symbol) + ' (last ~10 days):\n' +
+      realNews.map((n, i) => (i + 1) + '. ' + n.title + ' (' + n.source + ')').join('\n') + '\n\n'
+    : '';
+
   const prompt = 'An investor wrote these private research notes about ' + (name || symbol) + ' (' + symbol + '):\n"""\n' +
     notes + '\n"""\n\n' +
-    'Based ONLY on what is written above (never on outside knowledge of the company), respond with ONLY a JSON object, ' +
-    'no other text, matching exactly this shape:\n' +
+    newsBlock +
+    'Treat the investor\'s own notes as the primary source for their thesis. Use the real headlines above, if any, only as ' +
+    'current supporting context for the catalysts -- never invent anything beyond what the notes say or the headlines actually ' +
+    'report. Respond with ONLY a JSON object, no other text, matching exactly this shape:\n' +
     '{"thesis": "a 1-2 sentence synthesis of the investor\'s own stated thesis or view, written in third person", ' +
-    '"catalysts": ["first driver of return mentioned or implied in the notes", "second one", "third one"]}\n' +
-    'The catalysts must each be something actually supported by the notes -- never invented or generic. ' +
-    'If the notes clearly support fewer than three distinct catalysts, return fewer items in that array rather than padding it.';
+    '"catalysts": ["first driver of return, from the notes and/or the real headlines", "second one", "third one"]}\n' +
+    'If neither the notes nor the headlines support three distinct catalysts, return fewer items rather than padding it.';
 
   try {
     const aiResponse = await env.AI.run(EXPLAIN_MODEL, {
       messages: [
-        { role: 'system', content: 'You analyze one investor\'s own private notes and respond with ONLY valid JSON, no markdown fences, no commentary. Never use outside knowledge -- only what the notes themselves say.' },
+        { role: 'system', content: 'You analyze one investor\'s own private notes, optionally alongside real recent headlines about the company, and respond with ONLY valid JSON, no markdown fences, no commentary. Never invent anything beyond what the notes say or the headlines report.' },
         { role: 'user', content: prompt }
       ]
     });
@@ -561,6 +572,7 @@ async function handleThesis(request, env) {
     // rather than assuming .trim() always exists on it.
     const parsed = normalizeThesisPayload(aiResponse && aiResponse.response);
     if (!parsed) return json({ thesis: '', catalysts: [], error: 'could not parse a summary' }, 200, 0);
+    parsed.sources = realNews.map((n) => ({ title: n.title, source: n.source, link: n.link }));
     return json(parsed, 200, 0);
   } catch (err) {
     return json({ thesis: '', catalysts: [], error: String(err) }, 200, 0);
