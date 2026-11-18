@@ -407,7 +407,7 @@ function openEditOverlayForLi(li){
   if(!prefersReducedMotion) overlay.classList.add('bursting-in');
 
   loadExplain(li.dataset.sym, NAME_HINTS[li.dataset.sym] || li.dataset.name);
-  loadResearchNotes(li.dataset.sym);
+  loadResearchNotes(li.dataset.sym, li.dataset.name);
 
   currentChartRange = '1D';
   document.querySelectorAll('.chart-tab').forEach(function(b){ b.classList.toggle('active', b.dataset.range === '1D'); });
@@ -621,15 +621,18 @@ function getResearchNotes(){
   try{ return JSON.parse(localStorage.getItem(RESEARCH_NOTES_KEY) || '{}'); }catch(e){ return {}; }
 }
 
-function loadResearchNotes(sym){
+function loadResearchNotes(sym, name){
   var notes = getResearchNotes();
-  document.getElementById('researchNotesInput').value = notes[sym] || '';
+  var text = notes[sym] || '';
+  document.getElementById('researchNotesInput').value = text;
   document.getElementById('researchSavedHint').hidden = true;
+  loadThesisForSymbol(sym, name, text);
 }
 
 function saveResearchNotes(){
   if(!currentEditLi) return;
   var sym = currentEditLi.dataset.sym;
+  var name = currentEditLi.dataset.name;
   var notes = getResearchNotes();
   var text = document.getElementById('researchNotesInput').value;
   if(text.trim()) notes[sym] = text; else delete notes[sym];
@@ -639,6 +642,76 @@ function saveResearchNotes(){
   hint.hidden = false;
   clearTimeout(saveResearchNotes._t);
   saveResearchNotes._t = setTimeout(function(){ hint.hidden = true; }, 1800);
+  loadThesisForSymbol(sym, name, text); // notes changed -- regenerate once, then re-cache
+}
+
+// ---- Personal Thesis / Three Catalysts: AI summaries grounded ONLY in the notes above,
+// never public news. Generated once per saved version of a symbol's notes (cached
+// alongside the notes text itself, keyed by symbol) rather than on every overlay open --
+// re-generated only when Save Notes actually changes something. Shows nothing at all
+// when there are no notes, per the user's own request. ----
+var RESEARCH_THESIS_KEY = 'daybook_research_thesis';
+
+function getResearchThesisCache(){
+  try{ return JSON.parse(localStorage.getItem(RESEARCH_THESIS_KEY) || '{}'); }catch(e){ return {}; }
+}
+
+function setResearchThesisCache(sym, entry){
+  var cache = getResearchThesisCache();
+  cache[sym] = entry;
+  try{ localStorage.setItem(RESEARCH_THESIS_KEY, JSON.stringify(cache)); }catch(e){}
+}
+
+function renderThesisSections(entry){
+  var thesisCard = document.getElementById('thesisCard');
+  var catalystsCard = document.getElementById('catalystsCard');
+  var hasThesis = !!(entry && entry.thesis);
+  var hasCatalysts = !!(entry && entry.catalysts && entry.catalysts.length);
+  thesisCard.hidden = !hasThesis;
+  catalystsCard.hidden = !hasCatalysts;
+  document.getElementById('thesisText').textContent = hasThesis ? entry.thesis : '';
+  var list = document.getElementById('catalystsList');
+  list.innerHTML = '';
+  if(hasCatalysts){
+    entry.catalysts.forEach(function(c){
+      var li = document.createElement('li');
+      li.textContent = c;
+      list.appendChild(li);
+    });
+  }
+}
+
+function loadThesisForSymbol(sym, name, notes){
+  if(!notes || !notes.trim()){
+    renderThesisSections(null);
+    return;
+  }
+  var cached = getResearchThesisCache()[sym];
+  if(cached && cached.notes === notes){
+    renderThesisSections(cached);
+    return;
+  }
+
+  document.getElementById('thesisCard').hidden = false;
+  document.getElementById('catalystsCard').hidden = true;
+  document.getElementById('thesisText').textContent = 'Reading your notes…';
+
+  fetch(NEWS_API + 'thesis', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ symbol: sym, name: name || sym, notes: notes })
+  })
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      var entry = { notes: notes, thesis: data.thesis || '', catalysts: data.catalysts || [] };
+      setResearchThesisCache(sym, entry);
+      if(currentEditLi && currentEditLi.dataset.sym === sym) renderThesisSections(entry);
+    })
+    .catch(function(){
+      if(currentEditLi && currentEditLi.dataset.sym === sym){
+        document.getElementById('thesisText').textContent = "Couldn't generate a thesis right now.";
+      }
+    });
 }
 
 function removeEditPosition(){

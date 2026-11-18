@@ -254,6 +254,10 @@ button.tick{ cursor:pointer; -webkit-appearance:none; appearance:none; border-ra
 .edit-explain-sources{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; }
 .edit-explain-sources li a{ font-size:11.5px; color:var(--app-crimson); text-decoration:none; }
 .edit-explain-sources li a:hover{ text-decoration:underline; }
+.edit-catalysts-list{ list-style:none; counter-reset:catalyst; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
+.edit-catalysts-list li{ counter-increment:catalyst; position:relative; padding-left:24px; font-size:13.5px; line-height:1.45; color:var(--app-ink); }
+.edit-catalysts-list li::before{ content:counter(catalyst); position:absolute; left:0; top:0; font-weight:700; color:var(--app-crimson);
+  font-family:'Barlow Condensed',sans-serif; }
 .edit-fields{ display:flex; flex-direction:column; gap:16px; }
 .edit-field{ display:flex; flex-direction:column; gap:6px; }
 .edit-field span{ font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--app-ink-soft); font-weight:700; }

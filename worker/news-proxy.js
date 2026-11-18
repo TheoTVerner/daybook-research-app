@@ -3,6 +3,9 @@
 //   GET /quotes?symbols=AAPL,MSFT  -> real price + day change + company name via Finnhub (free tier)
 //   GET /indices  -> real major-index/VIX/yield/oil/bitcoin data for the markets ticker tape
 //   GET /explain?symbol=NVDA&name=Nvidia  -> a grounded "why is it moving" summary via Workers AI
+//   POST /thesis  {symbol, name, notes}  -> a "personal thesis" + three catalysts, generated via
+//     Workers AI grounded ONLY in the user's own saved research notes (never public news/data) --
+//     this is the one endpoint that sends something the user typed, not market data, to the AI
 //   GET /earnings?symbols=AAPL,MSFT  -> each symbol's next real earnings-call date via Finnhub
 //   GET /company-news?symbols=AAPL,MSFT  -> real per-company articles via Finnhub (last 10 days)
 //   GET /candles?symbol=AAPL&range=1D|5D|3M|6M|1Y|ALL  -> historical close prices via Twelve Data
@@ -90,6 +93,7 @@ export default {
       if (url.pathname === '/quotes') return await handleQuotes(url, env);
       if (url.pathname === '/indices') return await handleIndices(env);
       if (url.pathname === '/explain') return await handleExplain(url, env);
+      if (url.pathname === '/thesis' && request.method === 'POST') return await handleThesis(request, env);
       if (url.pathname === '/earnings') return await handleEarnings(url, env);
       if (url.pathname === '/company-news') return await handleCompanyNews(url, env);
       if (url.pathname === '/candles') return await handleCandles(url, env);
@@ -517,6 +521,63 @@ async function handleExplain(url, env) {
       summary: "Couldn't reach the summarizer right now. Recent related headlines are listed below.",
       sources: matches.map((m) => ({ title: m.title, source: m.source, link: m.link }))
     }, 200, 60);
+  }
+}
+
+// ---- /thesis (Workers AI, grounded ONLY in the user's own saved research notes --
+// never public news; this is their private thinking on the company, not Finnhub/RSS) ----
+
+async function handleThesis(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (err) {
+    return json({ error: 'invalid request body' }, 400);
+  }
+  const symbol = (body && body.symbol || '').trim().toUpperCase();
+  const name = (body && body.name || '').trim();
+  const notes = (body && body.notes || '').trim();
+  if (!symbol || !notes) return json({ error: 'symbol and notes are required' }, 400);
+
+  const prompt = 'An investor wrote these private research notes about ' + (name || symbol) + ' (' + symbol + '):\n"""\n' +
+    notes + '\n"""\n\n' +
+    'Based ONLY on what is written above (never on outside knowledge of the company), respond with ONLY a JSON object, ' +
+    'no other text, matching exactly this shape:\n' +
+    '{"thesis": "a 1-2 sentence synthesis of the investor\'s own stated thesis or view, written in third person", ' +
+    '"catalysts": ["first driver of return mentioned or implied in the notes", "second one", "third one"]}\n' +
+    'The catalysts must each be something actually supported by the notes -- never invented or generic. ' +
+    'If the notes clearly support fewer than three distinct catalysts, return fewer items in that array rather than padding it.';
+
+  try {
+    const aiResponse = await env.AI.run(EXPLAIN_MODEL, {
+      messages: [
+        { role: 'system', content: 'You analyze one investor\'s own private notes and respond with ONLY valid JSON, no markdown fences, no commentary. Never use outside knowledge -- only what the notes themselves say.' },
+        { role: 'user', content: prompt }
+      ]
+    });
+    const raw = (aiResponse && aiResponse.response) ? aiResponse.response.trim() : '';
+    const parsed = parseThesisResponse(raw);
+    if (!parsed) return json({ thesis: '', catalysts: [], error: 'could not parse a summary' }, 200, 0);
+    return json(parsed, 200, 0);
+  } catch (err) {
+    return json({ thesis: '', catalysts: [], error: String(err) }, 200, 0);
+  }
+}
+
+function parseThesisResponse(raw) {
+  if (!raw) return null;
+  // Models sometimes wrap JSON in ```json fences or add a stray sentence either side --
+  // pull out the first {...} block rather than assuming the whole response is clean JSON.
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    const data = JSON.parse(match[0]);
+    const thesis = typeof data.thesis === 'string' ? data.thesis.trim() : '';
+    const catalysts = Array.isArray(data.catalysts) ? data.catalysts.filter((c) => typeof c === 'string' && c.trim()).slice(0, 3) : [];
+    if (!thesis && catalysts.length === 0) return null;
+    return { thesis, catalysts };
+  } catch (err) {
+    return null;
   }
 }
 
