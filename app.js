@@ -504,6 +504,7 @@ function loadChart(sym, range){
   svg.innerHTML = '';
   document.getElementById('chartYAxis').innerHTML = '';
   document.getElementById('chartXAxis').innerHTML = '';
+  document.getElementById('chartPeriodReturn').innerHTML = '';
   loading.hidden = false;
   loading.textContent = 'Loading chart…';
   fetch(NEWS_API + 'candles?symbol=' + encodeURIComponent(sym) + '&range=' + encodeURIComponent(range))
@@ -515,6 +516,25 @@ function loadChart(sym, range){
       loading.hidden = true;
     })
     .catch(function(){ loading.textContent = "Couldn't load chart data right now."; });
+}
+
+// Shows the return over whichever range tab is selected, Yahoo Finance-style ("Past 5
+// Days +$12.34 (+2.1%)") -- distinct from the hero price row above, which always shows
+// today's change regardless of which chart range is active.
+var CHART_RANGE_LABELS = { '1D':'Today', '5D':'Past 5 Days', '3M':'Past 3 Months', '6M':'Past 6 Months', '1Y':'Past Year', 'ALL':'All Time' };
+
+function renderPeriodReturn(closes, range){
+  var el = document.getElementById('chartPeriodReturn');
+  if(!el) return;
+  var first = closes[0], last = closes[closes.length - 1];
+  var change = last - first;
+  var pct = first ? (change / first) * 100 : 0;
+  var up = change >= 0;
+  var sign = up ? '+' : '-';
+  var label = CHART_RANGE_LABELS[range] || range;
+  el.innerHTML = '<span class="chart-period-label">' + label + '</span>' +
+    '<span class="chart-period-value ' + (up ? 'up' : 'down') + '">' + sign + '$' + Math.abs(change).toFixed(2) +
+    ' (' + sign + Math.abs(pct).toFixed(2) + '%)</span>';
 }
 
 function drawChart(points, range){
@@ -534,6 +554,7 @@ function drawChart(points, range){
 
   var up = closes[closes.length - 1] >= closes[0];
   var color = up ? '#1d7a4c' : '#b3271e'; // matches --app-up/--app-down
+  renderPeriodReturn(closes, range);
 
   svg.innerHTML = '';
   svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
