@@ -687,7 +687,8 @@ function loadThesisForSymbol(sym, name, notes){
     return;
   }
   var cached = getResearchThesisCache()[sym];
-  if(cached && cached.notes === notes){
+  var cachedHasResult = cached && ((cached.thesis && cached.thesis.trim()) || (cached.catalysts && cached.catalysts.length));
+  if(cached && cached.notes === notes && cachedHasResult){
     renderThesisSections(cached);
     return;
   }
@@ -703,6 +704,15 @@ function loadThesisForSymbol(sym, name, notes){
   })
     .then(function(res){ return res.json(); })
     .then(function(data){
+      var hasResult = !!((data.thesis && data.thesis.trim()) || (data.catalysts && data.catalysts.length));
+      if(!hasResult){
+        // Don't cache a failed/empty result as if it were final -- an error (or a model
+        // hiccup) would otherwise stick permanently until the notes text itself changes.
+        if(currentEditLi && currentEditLi.dataset.sym === sym){
+          document.getElementById('thesisText').textContent = "Couldn't generate a thesis right now.";
+        }
+        return;
+      }
       var entry = { notes: notes, thesis: data.thesis || '', catalysts: data.catalysts || [] };
       setResearchThesisCache(sym, entry);
       if(currentEditLi && currentEditLi.dataset.sym === sym) renderThesisSections(entry);

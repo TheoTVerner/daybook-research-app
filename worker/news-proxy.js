@@ -555,8 +555,11 @@ async function handleThesis(request, env) {
         { role: 'user', content: prompt }
       ]
     });
-    const raw = (aiResponse && aiResponse.response) ? aiResponse.response.trim() : '';
-    const parsed = parseThesisResponse(raw);
+    // Workers AI usually puts the model's text in aiResponse.response as a plain string,
+    // but has been observed returning it as an already-parsed object instead (presumably
+    // some auto-JSON-detection on its end) -- normalizeThesisPayload handles either shape
+    // rather than assuming .trim() always exists on it.
+    const parsed = normalizeThesisPayload(aiResponse && aiResponse.response);
     if (!parsed) return json({ thesis: '', catalysts: [], error: 'could not parse a summary' }, 200, 0);
     return json(parsed, 200, 0);
   } catch (err) {
@@ -564,21 +567,25 @@ async function handleThesis(request, env) {
   }
 }
 
-function parseThesisResponse(raw) {
-  if (!raw) return null;
-  // Models sometimes wrap JSON in ```json fences or add a stray sentence either side --
-  // pull out the first {...} block rather than assuming the whole response is clean JSON.
-  const match = raw.match(/\{[\s\S]*\}/);
-  if (!match) return null;
-  try {
-    const data = JSON.parse(match[0]);
-    const thesis = typeof data.thesis === 'string' ? data.thesis.trim() : '';
-    const catalysts = Array.isArray(data.catalysts) ? data.catalysts.filter((c) => typeof c === 'string' && c.trim()).slice(0, 3) : [];
-    if (!thesis && catalysts.length === 0) return null;
-    return { thesis, catalysts };
-  } catch (err) {
-    return null;
+function normalizeThesisPayload(value) {
+  if (!value) return null;
+  let data = value;
+  if (typeof value === 'string') {
+    // Models sometimes wrap JSON in ```json fences or add a stray sentence either side --
+    // pull out the first {...} block rather than assuming the whole string is clean JSON.
+    const match = value.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try {
+      data = JSON.parse(match[0]);
+    } catch (err) {
+      return null;
+    }
   }
+  if (!data || typeof data !== 'object') return null;
+  const thesis = typeof data.thesis === 'string' ? data.thesis.trim() : '';
+  const catalysts = Array.isArray(data.catalysts) ? data.catalysts.filter((c) => typeof c === 'string' && c.trim()).slice(0, 3) : [];
+  if (!thesis && catalysts.length === 0) return null;
+  return { thesis, catalysts };
 }
 
 // ---- /spotify/token and /spotify/shows ----
